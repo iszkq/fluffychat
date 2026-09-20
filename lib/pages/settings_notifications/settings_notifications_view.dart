@@ -7,7 +7,6 @@ import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/settings_notifications/push_rule_extensions.dart';
-import 'package:fluffychat/utils/background_push.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/push_helper.dart';
 import 'package:fluffychat/widgets/layouts/max_width_body.dart';
@@ -15,8 +14,6 @@ import 'package:fluffychat/widgets/settings_switch_list_tile.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
-import 'package:unifiedpush/unifiedpush.dart';
-import 'package:unifiedpush_ui/unifiedpush_ui.dart';
 
 import '../../utils/localized_exception_extension.dart';
 import '../../widgets/matrix.dart';
@@ -58,6 +55,8 @@ class SettingsNotificationsView extends StatelessWidget {
           ),
           builder: (BuildContext context, _) {
             final theme = Theme.of(context);
+            final isChinese =
+                Localizations.localeOf(context).languageCode == 'zh';
             final lastReceivedPush =
                 lastReceivedPushNotification[Matrix.of(
                   context,
@@ -74,6 +73,68 @@ class SettingsNotificationsView extends StatelessWidget {
                     SettingsSwitchListTile.adaptive(
                       title: L10n.of(context).playSoundOnNotification,
                       setting: AppSettings.webNotificationSound,
+                    ),
+                  if (PlatformInfos.isAndroid)
+                    Builder(
+                      builder: (context) {
+                        final mode = Matrix.of(
+                          context,
+                        ).androidBackgroundNotificationsMode;
+                        return ListTile(
+                          leading: const Icon(Icons.sync),
+                          title: Text(
+                            isChinese
+                                ? '安卓后台通知'
+                                : 'Android background notifications',
+                          ),
+                          subtitle: Text(
+                            mode ==
+                                    AndroidBackgroundNotificationsMode
+                                        .persistent
+                                ? (isChinese
+                                      ? '可靠性更高。通过永久通知保持 Matrix 连接，会增加耗电。'
+                                      : 'Most reliable. Keeps Matrix connected with a permanent notification and uses more battery.')
+                                : (isChinese
+                                      ? '不显示永久通知；安卓关闭应用进程后将停止接收通知。'
+                                      : 'No permanent notification. Notifications stop after Android closes the app.'),
+                          ),
+                          trailing: DropdownButtonHideUnderline(
+                            child:
+                                DropdownButton<
+                                  AndroidBackgroundNotificationsMode
+                                >(
+                                  value: mode,
+                                  items: [
+                                    DropdownMenuItem(
+                                      value: AndroidBackgroundNotificationsMode
+                                          .persistent,
+                                      child: Text(
+                                        isChinese
+                                            ? '永久通知'
+                                            : 'Permanent notification',
+                                      ),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: AndroidBackgroundNotificationsMode
+                                          .whileAppRunning,
+                                      child: Text(
+                                        isChinese
+                                            ? '应用仍在后台时'
+                                            : 'While app is in background',
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (mode) {
+                                    if (mode == null) return;
+                                    controller
+                                        .setAndroidBackgroundNotificationsMode(
+                                          mode,
+                                        );
+                                  },
+                                ),
+                          ),
+                        );
+                      },
                     ),
                   if (pushRules != null)
                     for (final category in pushCategories) ...[
@@ -136,61 +197,14 @@ class SettingsNotificationsView extends StatelessWidget {
                       Divider(color: theme.dividerColor),
                     ],
 
-                  if (pushService?.firebaseEnabled != true)
+                  if (pushService?.firebaseEnabled != true &&
+                      !PlatformInfos.isAndroid)
                     ListTile(
                       title: Text(L10n.of(context).buildDoesNotSupportFirebase),
                       leading: Icon(
                         Icons.close,
                         color: theme.colorScheme.error,
                       ),
-                    ),
-                  if (PlatformInfos.isAndroid)
-                    FutureBuilder(
-                      future: UnifiedPush.getDistributors(),
-                      builder: (context, snapshot) {
-                        final distributors = snapshot.data;
-                        if (distributors == null || distributors.isEmpty) {
-                          if (pushService?.firebaseEnabled == true &&
-                              pushService?.fcmToken == null) {
-                            return ListTile(
-                              title: Text(
-                                L10n.of(
-                                  context,
-                                ).unableToRegisterDeviceForFirebase,
-                              ),
-                              leading: Icon(
-                                Icons.close,
-                                color: theme.colorScheme.error,
-                              ),
-                            );
-                          }
-                          return SizedBox.shrink();
-                        }
-                        return ListTile(
-                          title: Text(L10n.of(context).unifiedPushDistributors),
-                          leading: Icon(Icons.info_outlined),
-                          subtitle: SelectableText(distributors.join(', ')),
-                          trailing: distributors.length >= 2
-                              ? IconButton(
-                                  onPressed: () => UnifiedPushUi(
-                                    context: context,
-                                    instances: ['default'],
-                                    unifiedPushFunctions: UPFunctions(),
-                                    showNoDistribDialog: false,
-                                    onNoDistribDialogDismissed:
-                                        () {}, // TODO: Implement me
-                                  ).registerAppWithDialog(),
-                                  icon: Icon(Icons.edit_outlined),
-                                  style: IconButton.styleFrom(
-                                    backgroundColor:
-                                        theme.colorScheme.primaryContainer,
-                                    foregroundColor:
-                                        theme.colorScheme.onPrimaryContainer,
-                                  ),
-                                )
-                              : null,
-                        );
-                      },
                     ),
                   ListTile(
                     title: Text(

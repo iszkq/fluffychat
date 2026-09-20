@@ -264,6 +264,11 @@ class BackgroundPush {
   static bool _wentToRoomOnStartup = false;
 
   Future<void> setupPush(BuildContext context) async {
+    // Android receives notifications from its live Matrix sync connection.
+    // Do not register another push transport or show an FCM warning, because
+    // that would either duplicate notifications or require Google services.
+    if (PlatformInfos.isAndroid) return;
+
     if (PlatformInfos.isAndroid &&
         (await UnifiedPush.getDistributors()).isNotEmpty &&
         context.mounted) {

@@ -13,6 +13,17 @@ import 'package:managed_configurations/managed_configurations.dart';
 import 'package:matrix/matrix_api_lite/utils/logs.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+enum AndroidBackgroundNotificationsMode {
+  persistent,
+  whileAppRunning;
+
+  static AndroidBackgroundNotificationsMode fromSetting(String value) =>
+      AndroidBackgroundNotificationsMode.values.firstWhere(
+        (mode) => mode.name == value,
+        orElse: () => AndroidBackgroundNotificationsMode.persistent,
+      );
+}
+
 enum AppSettings<T> {
   textMessageMaxLength<int>('textMessageMaxLength', 16384),
 
@@ -37,6 +48,10 @@ enum AppSettings<T> {
   pushNotificationsPusherFormat<String>(
     'pushNotificationsPusherFormat',
     'event_id_only',
+  ),
+  androidBackgroundNotificationsMode<String>(
+    'chat.fluffy.android_background_notifications_mode',
+    'persistent',
   ),
   renderHtml<bool>('chat.fluffy.renderHtml', true),
   fontSizeFactor<double>('chat.fluffy.font_size_factor', 1.0),

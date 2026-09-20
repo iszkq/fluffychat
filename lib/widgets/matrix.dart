@@ -13,6 +13,7 @@ import 'package:fluffychat/utils/init_with_restore.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_file_extension.dart';
 import 'package:fluffychat/utils/notification_background_handler.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
+import 'package:fluffychat/utils/start_push_foreground_service.dart';
 import 'package:fluffychat/utils/uia_request_manager.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
@@ -171,6 +172,7 @@ class MatrixState extends State<Matrix> {
                   store,
                 );
                 _registerSubs(_loginClientCandidate!.clientName);
+                unawaited(configureAndroidBackgroundNotifications());
                 setActiveClient(_loginClientCandidate);
                 _loginClientCandidate = null;
                 FluffyChatApp.router.go('/backup');
@@ -269,6 +271,7 @@ class MatrixState extends State<Matrix> {
           widget.clients.remove(c);
           ClientManager.removeClientNameFromStore(c.clientName, store);
           InitWithRestoreExtension.deleteSessionBackup(name);
+          unawaited(configureAndroidBackgroundNotifications());
 
           if (loggedInWithMultipleClients) {
             final snackbarContext =
@@ -281,14 +284,31 @@ class MatrixState extends State<Matrix> {
 
             if (!snackbarContext.mounted) return;
             final l10n = L10n.of(snackbarContext);
-            ScaffoldMessenger.of(snackbarContext)
-                .showSnackBar(SnackBar(content: Text(l10n.oneClientLoggedOut)));
+            ScaffoldMessenger.of(
+              snackbarContext,
+            ).showSnackBar(SnackBar(content: Text(l10n.oneClientLoggedOut)));
             return;
           }
           FluffyChatApp.router.go('/');
         });
     onUiaRequest[name] ??= c.onUiaRequest.stream.listen(uiaRequestHandler);
-    if (PlatformInfos.isWeb || PlatformInfos.isLinux) {
+    if (PlatformInfos.isAndroid) {
+      FlutterLocalNotificationsPlugin().initialize(
+        settings: const InitializationSettings(
+          android: AndroidInitializationSettings('notifications_icon'),
+        ),
+        onDidReceiveNotificationResponse: (response) => notificationTap(
+          response,
+          clients: widget.clients,
+          router: FluffyChatApp.router,
+          l10n: null,
+        ),
+        onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
+      );
+      onNotification[name] ??= c.onNotification.stream.listen(
+        showLocalNotification,
+      );
+    } else if (PlatformInfos.isWeb || PlatformInfos.isLinux) {
       FlutterLocalNotificationsPlugin().initialize(
         settings: InitializationSettings(
           linux: LinuxInitializationSettings(
@@ -356,6 +376,40 @@ class MatrixState extends State<Matrix> {
         },
       );
     }
+    unawaited(configureAndroidBackgroundNotifications());
+  }
+
+  AndroidBackgroundNotificationsMode get androidBackgroundNotificationsMode =>
+      AndroidBackgroundNotificationsMode.fromSetting(
+        AppSettings.androidBackgroundNotificationsMode.value,
+      );
+
+  Future<void> setAndroidBackgroundNotificationsMode(
+    AndroidBackgroundNotificationsMode mode,
+  ) async {
+    await AppSettings.androidBackgroundNotificationsMode.setItem(mode.name);
+    await configureAndroidBackgroundNotifications();
+  }
+
+  Future<void> configureAndroidBackgroundNotifications() async {
+    if (!PlatformInfos.isAndroid) return;
+
+    for (final client in widget.clients) {
+      client.backgroundSync = true;
+    }
+
+    final shouldRunPersistentService =
+        androidBackgroundNotificationsMode ==
+            AndroidBackgroundNotificationsMode.persistent &&
+        widget.clients.any((client) => client.isLogged());
+    if (shouldRunPersistentService) {
+      await ForegroundServices.startService(
+        'persistent_matrix_sync',
+        persistent: true,
+      );
+    } else {
+      await ForegroundServices.stopService('persistent_matrix_sync');
+    }
   }
 
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -367,10 +421,13 @@ class MatrixState extends State<Matrix> {
           ? null
           : PresenceType.unavailable;
       if (PlatformInfos.isMobile) {
-        client.backgroundSync = foreground;
+        client.backgroundSync = PlatformInfos.isAndroid || foreground;
         client.requestHistoryOnLimitedTimeline = !foreground;
         Logs().v('Set background sync to', foreground);
       }
+    }
+    if (state == AppLifecycleState.resumed) {
+      unawaited(configureAndroidBackgroundNotifications());
     }
   }
 

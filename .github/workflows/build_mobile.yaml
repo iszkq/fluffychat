@@ -16,18 +16,13 @@ on:
         required: true
         default: https://124.222.193.241:6258
         type: string
-      push_gateway_url:
-        description: Matrix push gateway URL for Android FCM
-        required: true
-        default: https://flchat.221819.best/_matrix/push/v1/notify
-        type: string
 
 permissions:
   contents: read
 
 jobs:
   android_apk:
-    name: Android full FCM APK
+    name: Android background-sync APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -40,26 +35,6 @@ jobs:
           cache: true
 
       - uses: dtolnay/rust-toolchain@stable
-
-      - name: Configure Firebase Messaging
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: |
-          if [ -z "${GOOGLE_SERVICES_JSON}" ]; then
-            echo "::error::Missing GOOGLE_SERVICES_JSON repository secret. Store the Firebase google-services.json contents or its base64 value in this secret."
-            exit 1
-          fi
-          if printf '%s' "${GOOGLE_SERVICES_JSON}" | jq -e . >/dev/null 2>&1; then
-            printf '%s' "${GOOGLE_SERVICES_JSON}" > android/app/google-services.json
-          else
-            printf '%s' "${GOOGLE_SERVICES_JSON}" | base64 --decode > android/app/google-services.json
-          fi
-          jq -e '.client[] | select(.client_info.android_client_info.package_name == "chat.fluffy.fluffychat")' \
-            android/app/google-services.json >/dev/null || {
-              echo "::error::google-services.json does not contain Android package chat.fluffy.fluffychat."
-              exit 1
-            }
-          ./scripts/add-firebase-messaging.sh
 
       - name: Configure stable release signing
         env:
@@ -82,11 +57,10 @@ jobs:
             printf 'storeFile=release.keystore\n'
           } > android/key.properties
 
-      - name: Build installable FCM APK
+      - name: Build installable background-sync APK
         env:
           VOICE_TRANSCRIPTION_ENDPOINT: ${{ inputs.voice_transcription_endpoint }}
           OFFICE_EDITOR_URL: ${{ inputs.office_editor_url }}
-          PUSH_NOTIFICATIONS_GATEWAY_URL: ${{ inputs.push_gateway_url }}
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
         run: |
           build_number=$((300000 + GITHUB_RUN_NUMBER))
@@ -95,17 +69,16 @@ jobs:
             --build-number="${build_number}" \
             --target-platform android-arm,android-arm64 \
             --dart-define="VOICE_TRANSCRIPTION_ENDPOINT=${VOICE_TRANSCRIPTION_ENDPOINT}" \
-            --dart-define="OFFICE_EDITOR_URL=${OFFICE_EDITOR_URL}" \
-            --dart-define="PUSH_NOTIFICATIONS_GATEWAY_URL=${PUSH_NOTIFICATIONS_GATEWAY_URL}"
+            --dart-define="OFFICE_EDITOR_URL=${OFFICE_EDITOR_URL}"
 
       - name: Rename APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk fluffychat-android-fcm.apk
+        run: cp build/app/outputs/flutter-apk/app-release.apk fluffychat-android-background-sync.apk
 
       - name: Upload Android package
         uses: actions/upload-artifact@v7
         with:
-          name: fluffychat-android-fcm
-          path: fluffychat-android-fcm.apk
+          name: fluffychat-android-background-sync
+          path: fluffychat-android-background-sync.apk
           retention-days: 14
 
   ios_unsigned_ipa:

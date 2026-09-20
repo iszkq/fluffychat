@@ -3,11 +3,13 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/client_download_content_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/utils/notification_background_handler.dart';
+import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/push_helper.dart';
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
 import 'package:fluffychat/widgets/incoming_call_dialog.dart';
@@ -42,6 +44,11 @@ extension LocalNotificationsExtension on MatrixState {
 
     final l10n = L10n.of(context);
     final roomId = event.room.id;
+    final eventClient = event.room.client;
+    if (PlatformInfos.isAndroid &&
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      return;
+    }
     if (activeRoomId == roomId) {
       if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
         return;
@@ -55,7 +62,7 @@ extension LocalNotificationsExtension on MatrixState {
       MatrixLocals(L10n.of(context)),
       withSenderNamePrefix:
           !event.room.isDirectChat ||
-          event.room.lastEvent?.senderId == client.userID,
+          event.room.lastEvent?.senderId == eventClient.userID,
       plaintextBody: true,
       hideReply: true,
       hideEdit: true,
@@ -69,7 +76,7 @@ extension LocalNotificationsExtension on MatrixState {
     if (avatarUrl != null) {
       // Pre-cache so that we can later just set the thumbnail uri as icon:
       try {
-        await client.downloadMxcCached(
+        await eventClient.downloadMxcCached(
           avatarUrl,
           width: size,
           height: size,
@@ -84,7 +91,7 @@ extension LocalNotificationsExtension on MatrixState {
 
     if (kIsWeb) {
       final thumbnailUri = await avatarUrl?.getThumbnailUri(
-        client,
+        eventClient,
         width: size,
         height: size,
         method: thumbnailMethod,
@@ -102,10 +109,19 @@ extension LocalNotificationsExtension on MatrixState {
     }
 
     FlutterLocalNotificationsPlugin().show(
-      id: event.room.id.hashCode,
+      id: '${event.room.client.clientName}_${event.room.id}'.hashCode,
       title: title,
       body: body,
       notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          AppConfig.pushNotificationsChannelId,
+          l10n.incomingMessages,
+          importance: Importance.high,
+          priority: Priority.max,
+          category: AndroidNotificationCategory.message,
+          groupKey: event.room.client.clientName,
+          shortcutId: event.room.id,
+        ),
         linux: LinuxNotificationDetails(
           sound: ThemeLinuxSound('message-new-instant'),
           actions: switch (event.type) {

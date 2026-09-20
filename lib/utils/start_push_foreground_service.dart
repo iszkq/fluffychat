@@ -12,7 +12,8 @@ import 'package:universal_html/html.dart' as html;
 import '../l10n/l10n.dart';
 
 abstract class ForegroundServices {
-  static final List<String> runningServices = [];
+  static final Set<String> runningServices = {};
+  static final Set<String> _persistentServices = {};
 
   static bool get platformSupported =>
       PlatformInfos.isMobile || PlatformInfos.isWeb;
@@ -24,6 +25,7 @@ abstract class ForegroundServices {
 
   static Future<void> stopService(String name) async {
     runningServices.remove(name);
+    _persistentServices.remove(name);
     if (runningServices.isNotEmpty) return;
     if (kIsWeb) {
       html.window.removeEventListener('beforeunload', _beforeUnload);
@@ -32,9 +34,14 @@ abstract class ForegroundServices {
     FlutterForegroundTask.stopService();
   }
 
-  static Future<void> startService(String name) async {
+  static Future<void> startService(
+    String name, {
+    bool persistent = false,
+  }) async {
     try {
+      final persistentServiceWasAlreadyRunning = _persistentServices.isNotEmpty;
       runningServices.add(name);
+      if (persistent) _persistentServices.add(name);
       if (kIsWeb) {
         html.window.addEventListener('beforeunload', _beforeUnload);
         return;
@@ -60,16 +67,33 @@ abstract class ForegroundServices {
           foregroundTaskOptions: ForegroundTaskOptions(
             eventAction: ForegroundTaskEventAction.nothing(),
             allowWakeLock: true,
+            allowWifiLock: persistent,
+            allowAutoRestart: persistent,
+            stopWithTask: persistent ? false : null,
           ),
         );
         if (await FlutterForegroundTask.isRunningService) {
-          Logs().d('[PushHelper] Foreground service already running');
-          return;
+          if (!persistent || persistentServiceWasAlreadyRunning) {
+            Logs().d('[PushHelper] Foreground service already running');
+            return;
+          }
+          await FlutterForegroundTask.stopService();
+        }
+        if (persistent &&
+            await FlutterForegroundTask.checkNotificationPermission() !=
+                NotificationPermission.granted) {
+          await FlutterForegroundTask.requestNotificationPermission();
         }
         final result = await FlutterForegroundTask.startService(
-          serviceTypes: [ForegroundServiceTypes.shortService],
+          serviceTypes: [
+            persistent
+                ? ForegroundServiceTypes.remoteMessaging
+                : ForegroundServiceTypes.shortService,
+          ],
           notificationTitle: 'FluffyChat',
-          notificationText: l10n.loadingMessages,
+          notificationText: persistent
+              ? l10n.notifications
+              : l10n.loadingMessages,
           notificationIcon: NotificationIcon(metaDataName: 'ic_launcher'),
         );
         final started = result is ServiceRequestSuccess;

@@ -6,6 +6,7 @@
 import 'dart:convert';
 
 import 'package:fluffychat/config/app_config.dart';
+import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/settings_notifications/push_rule_extensions.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
@@ -29,6 +30,13 @@ class SettingsNotifications extends StatefulWidget {
 
 class SettingsNotificationsController extends State<SettingsNotifications> {
   bool isLoading = false;
+
+  Future<void> setAndroidBackgroundNotificationsMode(
+    AndroidBackgroundNotificationsMode mode,
+  ) async {
+    await Matrix.of(context).setAndroidBackgroundNotificationsMode(mode);
+    if (mounted) setState(() {});
+  }
 
   Future<void> onPusherTap(Pusher pusher) async {
     final delete = await showModalActionPopup<bool>(
