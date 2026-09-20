@@ -807,7 +807,7 @@ class Message extends StatelessWidget {
                                                                         onSelected:
                                                                             (
                                                                               sticker,
-                                                                            ) =>
+                                                                            ) async =>
                                                                                 Navigator.of(
                                                                                   context,
                                                                                 ).pop(

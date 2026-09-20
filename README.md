@@ -18,6 +18,7 @@ Web、Windows、macOS 和 Linux。
 - 接收端根据文件真实内容识别 OGG、AAC、M4A、MP3、WAV、FLAC、WebM、
   AMR 和 3GP，降低 MIME 或扩展名错误造成的播放失败。
 - 语音消息支持 AI 转文字、复制转录内容、展开和收起。
+- 内置可搜索、可切换分类的云端贴纸库，发送时自动转存到 Matrix 媒体库。
 - 提供 Cloudflare Pages Function 代理，API 密钥不会进入网页包或手机安装包。
 - 优化 Web 音频与图片缓存，降低媒体消息较多时的浏览器内存占用。
 - 支持 Cloudflare Pages 连接 GitHub 后自动构建和部署。

@@ -91,6 +91,10 @@ enum AppSettings<T> {
       'VOICE_TRANSCRIPTION_ENDPOINT',
       defaultValue: '/api/transcribe',
     ),
+  ),
+  cloudStickerIndexUrl<String>(
+    'cloudStickerIndexUrl',
+    'https://image.527012.xyz/index.json',
   );
 
   final String key;

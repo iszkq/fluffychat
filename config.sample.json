@@ -15,6 +15,7 @@
   "audioRecordingBitRate": 64000,
   "audioRecordingSamplingRate": 44100,
   "voiceTranscriptionEndpoint": "/api/transcribe",
+  "cloudStickerIndexUrl": "https://image.527012.xyz/index.json",
   "renderHtml": true,
   "fontSizeFactor": 1,
   "messagePreviewMaxLines": 128,
