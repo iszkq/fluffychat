@@ -76,6 +76,10 @@ Web 端会读取站点根目录下的 `config.json`，完整示例见
 flutter build apk --release
 ```
 
+也可以在 GitHub 仓库的 Actions 页面手动运行 `Build Mobile Packages`，输入
+完整的 Cloudflare 转录接口地址后下载测试 APK。该 APK 使用调试签名，仅用于
+直接安装和功能测试；上架应用商店前必须配置自己的长期签名证书。
+
 手机端需要使用已部署的转录代理时，传入完整地址：
 
 ```sh
@@ -90,6 +94,9 @@ flutter build apk --release \
 ```sh
 ./scripts/build-ios.sh
 ```
+
+`Build Mobile Packages` 也会生成未签名 IPA，供后续签名使用。未签名 IPA 无法
+直接安装到普通 iPhone，也不能提交 App Store。
 
 ## Web
 

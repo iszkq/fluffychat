@@ -1,0 +1,98 @@
+# SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: Build Mobile Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      voice_transcription_endpoint:
+        description: Full Cloudflare URL ending in /api/transcribe
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  android_apk:
+    name: Android test APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/free_up_space
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build installable APK
+        env:
+          VOICE_TRANSCRIPTION_ENDPOINT: ${{ inputs.voice_transcription_endpoint }}
+        run: >-
+          flutter build apk
+          --debug
+          --target-platform android-arm,android-arm64
+          --dart-define="VOICE_TRANSCRIPTION_ENDPOINT=${VOICE_TRANSCRIPTION_ENDPOINT}"
+
+      - name: Rename APK
+        run: cp build/app/outputs/flutter-apk/app-debug.apk fluffychat-android-test.apk
+
+      - name: Upload Android package
+        uses: actions/upload-artifact@v7
+        with:
+          name: fluffychat-android-test
+          path: fluffychat-android-test.apk
+          retention-days: 14
+
+  ios_unsigned_ipa:
+    name: iOS unsigned IPA
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app
+
+      - name: Install native dependencies
+        run: brew install sqlcipher
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS app without signing
+        env:
+          VOICE_TRANSCRIPTION_ENDPOINT: ${{ inputs.voice_transcription_endpoint }}
+        run: >-
+          flutter build ios
+          --release
+          --no-codesign
+          --dart-define="VOICE_TRANSCRIPTION_ENDPOINT=${VOICE_TRANSCRIPTION_ENDPOINT}"
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p build/unsigned-ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/unsigned-ipa/Payload/
+          cd build/unsigned-ipa
+          zip -qry ../../fluffychat-ios-unsigned.ipa Payload
+
+      - name: Upload iOS package
+        uses: actions/upload-artifact@v7
+        with:
+          name: fluffychat-ios-unsigned
+          path: fluffychat-ios-unsigned.ipa
+          retention-days: 14
