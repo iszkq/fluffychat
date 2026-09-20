@@ -111,7 +111,7 @@ class ImageViewerView extends StatelessWidget {
                       switch (event.messageType) {
                         case MessageTypes.Video:
                           return Padding(
-                            padding: const EdgeInsets.only(top: 52.0),
+                            padding: const EdgeInsets.fromLTRB(12, 64, 12, 16),
                             child: Center(
                               child: GestureDetector(
                                 // Ignore taps to not go back here:

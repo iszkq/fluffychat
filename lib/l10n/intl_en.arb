@@ -2837,5 +2837,6 @@
     "voiceTranscriptionFailed": "Unable to transcribe this voice message.",
     "voiceTranscriptionNotConfigured": "Voice transcription is not configured for this build.",
     "collapse": "Collapse",
-    "expand": "Expand"
+    "expand": "Expand",
+    "playbackSpeed": "Playback speed"
 }

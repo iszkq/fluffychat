@@ -367,6 +367,15 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
     }
   }
 
+  void _onTranscriptionButtonPressed() {
+    if (_isTranscribing) return;
+    if (_transcription == null) {
+      _transcribe();
+      return;
+    }
+    setState(() => _transcriptionExpanded = !_transcriptionExpanded);
+  }
+
   Future<void> _toggleSpeed() async {
     final audioPlayer = matrix.audioPlayer;
     if (audioPlayer == null) return;
@@ -602,15 +611,8 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        AnimatedCrossFade(
-                          firstChild: Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: Icon(
-                              Icons.mic_none_outlined,
-                              color: widget.color,
-                            ),
-                          ),
-                          secondChild: Material(
+                        if (audioPlayer != null) ...[
+                          Material(
                             color: widget.color.withAlpha(64),
                             borderRadius: BorderRadius.circular(
                               AppConfig.borderRadius,
@@ -625,7 +627,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                                 height: 20,
                                 child: Center(
                                   child: Text(
-                                    '${audioPlayer?.speed}x',
+                                    '${audioPlayer.speed}x',
                                     style: TextStyle(
                                       color: widget.color,
                                       fontSize: 9,
@@ -635,138 +637,123 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                               ),
                             ),
                           ),
-                          alignment: Alignment.center,
-                          crossFadeState: audioPlayer == null
-                              ? CrossFadeState.showFirst
-                              : CrossFadeState.showSecond,
-                          duration: FluffyThemes.animationDuration,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: FluffyThemes.columnWidth,
-                    ),
-                    child: _isTranscribing
-                        ? Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SizedBox.square(
-                                  dimension: 16,
+                          const SizedBox(width: 4),
+                        ],
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 32,
+                            height: 32,
+                          ),
+                          padding: EdgeInsets.zero,
+                          tooltip: _transcription == null
+                              ? l10n.voiceToText
+                              : _transcriptionExpanded
+                              ? l10n.collapse
+                              : l10n.expand,
+                          onPressed: _isTranscribing
+                              ? null
+                              : _onTranscriptionButtonPressed,
+                          icon: _isTranscribing
+                              ? SizedBox.square(
+                                  dimension: 15,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     color: widget.color,
                                   ),
+                                )
+                              : Icon(
+                                  _transcription == null
+                                      ? Icons.text_snippet_outlined
+                                      : _transcriptionExpanded
+                                      ? Icons.text_snippet
+                                      : Icons.text_snippet_outlined,
+                                  size: 20,
                                 ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    l10n.transcribingVoiceMessage,
-                                    style: TextStyle(color: widget.color),
-                                  ),
+                          color: widget.color,
+                        ),
+                      ],
+                    ),
+                  ),
+                  AnimatedSize(
+                    duration: FluffyThemes.animationDuration,
+                    curve: FluffyThemes.animationCurve,
+                    child: _transcription == null || !_transcriptionExpanded
+                        ? const SizedBox.shrink()
+                        : ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              maxWidth: FluffyThemes.columnWidth,
+                            ),
+                            child: Container(
+                              margin: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: widget.color.withAlpha(24),
+                                borderRadius: BorderRadius.circular(
+                                  AppConfig.borderRadius / 2,
                                 ),
-                              ],
-                            ),
-                          )
-                        : _transcription == null
-                        ? Align(
-                            alignment: AlignmentDirectional.centerStart,
-                            child: TextButton.icon(
-                              onPressed: _transcribe,
-                              icon: const Icon(Icons.text_snippet_outlined),
-                              label: Text(l10n.voiceToText),
-                              style: TextButton.styleFrom(
-                                foregroundColor: widget.color,
                               ),
-                            ),
-                          )
-                        : Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 8),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: widget.color.withAlpha(24),
-                              borderRadius: BorderRadius.circular(
-                                AppConfig.borderRadius / 2,
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        l10n.voiceTranscription,
-                                        style: TextStyle(
-                                          color: widget.color,
-                                          fontWeight: FontWeight.bold,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          l10n.voiceTranscription,
+                                          style: TextStyle(
+                                            color: widget.color,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      tooltip: l10n.copy,
-                                      onPressed: () async {
-                                        await Clipboard.setData(
-                                          ClipboardData(text: _transcription!),
-                                        );
-                                        if (!context.mounted) return;
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              l10n.copiedToClipboard,
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        tooltip: l10n.copy,
+                                        onPressed: () async {
+                                          await Clipboard.setData(
+                                            ClipboardData(
+                                              text: _transcription!,
                                             ),
-                                          ),
-                                        );
-                                      },
-                                      icon: const Icon(Icons.copy_outlined),
-                                      color: widget.color,
-                                    ),
-                                    IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      tooltip: _transcriptionExpanded
-                                          ? l10n.collapse
-                                          : l10n.expand,
-                                      onPressed: () => setState(
-                                        () => _transcriptionExpanded =
-                                            !_transcriptionExpanded,
-                                      ),
-                                      icon: Icon(
-                                        _transcriptionExpanded
-                                            ? Icons.expand_less
-                                            : Icons.expand_more,
-                                      ),
-                                      color: widget.color,
-                                    ),
-                                  ],
-                                ),
-                                AnimatedSize(
-                                  duration: FluffyThemes.animationDuration,
-                                  curve: FluffyThemes.animationCurve,
-                                  child: _transcriptionExpanded
-                                      ? Padding(
-                                          padding: const EdgeInsets.all(8),
-                                          child: SelectableText(
-                                            _transcription!,
-                                            style: TextStyle(
-                                              color: widget.color,
-                                              fontSize: widget.fontSize,
+                                          );
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                l10n.copiedToClipboard,
+                                              ),
                                             ),
-                                          ),
-                                        )
-                                      : const SizedBox.shrink(),
-                                ),
-                              ],
+                                          );
+                                        },
+                                        icon: const Icon(Icons.copy_outlined),
+                                        color: widget.color,
+                                      ),
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        tooltip: l10n.collapse,
+                                        onPressed: () => setState(
+                                          () => _transcriptionExpanded = false,
+                                        ),
+                                        icon: const Icon(Icons.expand_less),
+                                        color: widget.color,
+                                      ),
+                                    ],
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: SelectableText(
+                                      _transcription!,
+                                      style: TextStyle(
+                                        color: widget.color,
+                                        fontSize: widget.fontSize,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                   ),

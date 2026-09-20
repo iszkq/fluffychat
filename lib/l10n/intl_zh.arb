@@ -2854,5 +2854,6 @@
     "voiceTranscriptionFailed": "无法转录这条语音消息。",
     "voiceTranscriptionNotConfigured": "当前版本尚未配置语音转文字服务。",
     "collapse": "收起",
-    "expand": "展开"
+    "expand": "展开",
+    "playbackSpeed": "播放速度"
 }

@@ -6,6 +6,7 @@
 import 'dart:io';
 
 import 'package:chewie/chewie.dart';
+import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
@@ -90,7 +91,16 @@ class EventVideoPlayerState extends State<EventVideoPlayer> {
       setState(() {
         _chewieController = ChewieController(
           videoPlayerController: videoPlayerController,
-          showControlsOnInitialize: false,
+          optionsTranslation: OptionsTranslation(
+            playbackSpeedButtonText: L10n.of(context).playbackSpeed,
+            cancelButtonText: L10n.of(context).cancel,
+          ),
+          showControlsOnInitialize: true,
+          showControls: true,
+          showOptions: true,
+          draggableProgressBar: true,
+          allowPlaybackSpeedChanging: true,
+          playbackSpeeds: const [0.5, 0.75, 1, 1.25, 1.5, 2],
           autoPlay: true,
           autoInitialize: true,
           looping: true,
@@ -142,17 +152,30 @@ class EventVideoPlayerState extends State<EventVideoPlayer> {
     final infoMap = widget.event.content.tryGetMap<String, Object?>('info');
     final videoWidth = infoMap?.tryGet<int>('w') ?? 400;
     final videoHeight = infoMap?.tryGet<int>('h') ?? 300;
-    final height = MediaQuery.sizeOf(context).height - 52;
-    final width = videoWidth * (height / videoHeight);
 
     final chewieController = _chewieController;
     return chewieController != null
-        ? Center(
-            child: SizedBox(
-              width: width,
-              height: height,
-              child: Chewie(controller: chewieController),
-            ),
+        ? LayoutBuilder(
+            builder: (context, constraints) {
+              final maxWidth = constraints.maxWidth;
+              final maxHeight = constraints.maxHeight;
+              final aspectRatio =
+                  _videoPlayerController?.value.aspectRatio ??
+                  videoWidth / videoHeight;
+              var width = maxWidth;
+              var height = width / aspectRatio;
+              if (height > maxHeight) {
+                height = maxHeight;
+                width = height * aspectRatio;
+              }
+              return Center(
+                child: SizedBox(
+                  width: width,
+                  height: height,
+                  child: Chewie(controller: chewieController),
+                ),
+              );
+            },
           )
         : Stack(
             children: [
@@ -163,20 +186,18 @@ class EventVideoPlayerState extends State<EventVideoPlayer> {
                       ? MxcImage(
                           event: widget.event,
                           isThumbnail: true,
-                          width: width,
-                          height: height,
                           fit: BoxFit.cover,
                           placeholder: (context) => BlurHash(
                             blurhash: blurHash,
-                            width: width,
-                            height: height,
+                            width: double.infinity,
+                            height: double.infinity,
                             fit: BoxFit.cover,
                           ),
                         )
                       : BlurHash(
                           blurhash: blurHash,
-                          width: width,
-                          height: height,
+                          width: double.infinity,
+                          height: double.infinity,
                         ),
                 ),
               ),
