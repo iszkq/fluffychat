@@ -84,6 +84,13 @@ enum AppSettings<T> {
   fallbackLiveKitInstance<String>(
     'chat.fluffy.fallback_live_kit_instance',
     'https://livekit-jwt.fluffy.chat',
+  ),
+  voiceTranscriptionEndpoint<String>(
+    'voiceTranscriptionEndpoint',
+    String.fromEnvironment(
+      'VOICE_TRANSCRIPTION_ENDPOINT',
+      defaultValue: '/api/transcribe',
+    ),
   );
 
   final String key;

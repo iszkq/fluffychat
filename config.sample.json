@@ -10,6 +10,7 @@
   "audioRecordingNoiseSuppress": true,
   "audioRecordingBitRate": 64000,
   "audioRecordingSamplingRate": 44100,
+  "voiceTranscriptionEndpoint": "/api/transcribe",
   "renderHtml": true,
   "fontSizeFactor": 1,
   "messagePreviewMaxLines": 128,

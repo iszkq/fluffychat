@@ -5,18 +5,13 @@ SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# Security Policy
+# 安全说明
 
-If you believe you have discovered a security vulnerability in this project, **do not open a public issue**.
+发现安全漏洞时，请勿创建公开 Issue，也不要公开访问令牌、API 密钥、加密密钥或
+可直接复现攻击的细节。
 
-To report a security issue responsibly, please go to the Security tab or visit:
+请通过 GitHub Security Advisory 私下报告：
 
-https://github.com/krille-chan/fluffychat/security/advisories/new
+<https://github.com/iszkq/fluffychat/security/advisories/new>
 
-The following information can help us address the issue:
-
-- Clear steps to reproduce the vulnerability
-- The software version you are using
-- The affected platforms
-
-We appreciate your report and will respond as quickly as possible. Please note that this project is maintained by volunteers and is provided without guarantees.
+报告中请尽量提供复现步骤、软件版本、受影响平台以及已去除真实用户数据的日志。

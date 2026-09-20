@@ -5,134 +5,139 @@ SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-[FluffyChat](https://fluffy.chat) is an open source, nonprofit and cute [[matrix](https://matrix.org)] client written in [Flutter](https://flutter.dev). The goal of the app is to create an easy to use instant messenger which is open source and accessible for everyone.
+# FluffyChat 二次开发版
 
-### Links:
+本项目基于开源 Matrix 客户端 [FluffyChat](https://fluffy.chat) 继续开发，使用
+[Flutter](https://flutter.dev) 构建。它使用同一套业务代码支持 Android、iOS、
+Web、Windows、macOS 和 Linux。
 
-- 🌐 [[Weblate] Translate FluffyChat into your language](https://hosted.weblate.org/projects/fluffychat/)
-- 🌍 [[m] Join the community](https://matrix.to/#/#fluffy-space:matrix.org)
-- 📰 [[Mastodon] Get updates on social media](https://troet.cafe/@krille)
-- 💝 [[Liberapay] Support FluffyChat development](https://de.liberapay.com/KrilleChritzelius)
+## 本仓库新增和改进
 
-<a href='https://ko-fi.com/krille' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi5.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+- 支持同时选择多个私聊或群聊转发消息。
+- 保持非 iOS 平台优先发送 OGG/Opus 语音，兼容 Element X。
+- 接收端根据文件真实内容识别 OGG、AAC、M4A、MP3、WAV、FLAC、WebM、
+  AMR 和 3GP，降低 MIME 或扩展名错误造成的播放失败。
+- 语音消息支持 AI 转文字、复制转录内容、展开和收起。
+- 提供 Cloudflare Pages Function 代理，API 密钥不会进入网页包或手机安装包。
+- 优化 Web 音频与图片缓存，降低媒体消息较多时的浏览器内存占用。
+- 增加 Cloudflare Pages 自动构建和部署工作流。
 
-### Screenshots:
+## 原项目能力
 
-<img src="https://github.com/krille-chan/fluffychat-website/blob/main/public/img/screenshot_mobile.png?raw=true" height="300">
-<img src="https://github.com/krille-chan/fluffychat-website/blob/main/public/img/screenshot_desktop.png?raw=true" height="300">
+- 文字、图片、语音、视频和文件消息
+- Matrix RTC 音视频通话
+- 私聊、群聊、公共频道和空间
+- 推送通知与位置共享
+- Material You 界面
+- 自定义表情和贴纸
+- 端到端加密、聊天备份、Emoji 验证与交叉签名
 
-# Features
+## 开发环境
 
-- 📩 Send all kinds of messages, images and files
-- 🤙 Video calls with Matrix RTC
-- 🎙️ Voice messages
-- 📍 Location sharing
-- 🔔 Push notifications
-- 💬 Unlimited private and public group chats
-- 📣 Public channels with thousands of participants
-- 🛠️ Feature rich group moderation including all matrix features
-- 🔍 Discover and join public groups
-- 🎨 Material You design
-- 😄 Custom emotes and stickers
-- 🌌 Spaces
-- 🔐 End to end encryption
-- 🔒 Encrypted chat backup
-- 😀 Emoji verification & cross signing
-... and much more.
+需要安装：
 
+- Flutter，版本以 `.tool_versions.yaml` 为准
+- Rust
+- Git
 
-# Installation
+克隆并安装依赖：
 
-Please visit the website for installation instructions:
-
-- https://fluffy.chat
-
-# Configuration and Mobile Device Management (MDM)
-
-FluffyChat supports configuration via MDM on Android&iOS (since v2.10.0) and via a config.json file on web. You can see the populated configuration for MDM on Android in this file under `/android/app/src/main/res/xml/app_restrictions.xml`.
-An example configuration can be found in the `config.sample.json` file.
-
-# How to build
-
-1. To build FluffyChat you need [Flutter](https://flutter.dev) and [Rust](https://www.rust-lang.org/tools/install)
-
-2. Clone the repo:
-```
-git clone https://github.com/krille-chan/fluffychat.git
+```sh
+git clone https://github.com/iszkq/fluffychat.git
 cd fluffychat
-```
-3. Choose your target platform below and enable support for it.
-3.1 If you want, enable Googles Firebase Cloud Messaging:
-
-`./scripts/add-firebase-messaging.sh`
-
-4. Debug with: `flutter run`
-
-### Android
-
-* Build with: `flutter build apk`
-
-### iOS / iPadOS
-
-* Have a Mac with Xcode installed, and set up for Xcode-managed app signing
-* If you want automatic app installation to connected devices, make sure you have Apple Configurator installed, with the Automation Tools (`cfgutil`) enabled
-* Set a few environment variables
-    * FLUFFYCHAT_NEW_TEAM: the Apple Developer team that your certificates should live under
-    * FLUFFYCHAT_NEW_GROUP: the group you want App IDs and such to live under (ie: com.example.fluffychat)
-    * FLUFFYCHAT_INSTALL_IPA: set to `1` if you want the IPA to be deployed to connected devices after building, otherwise unset
-* Run `./scripts/build-ios.sh`
-
-### Web
-
-* Build with:
-```bash
-./scripts/prepare-web.sh # To install Vodozemac
-flutter build web --release
+flutter pub get
 ```
 
-* Optionally configure by serving a `config.json` at the same path as fluffychat.
-  An example can be found at `config.sample.json`. All values there are optional.
-  **Please only the values, you really need**. If you e.g. only want
-  to change the default homeserver, then only modify the `defaultHomeserver` key.
+运行开发版本：
 
-### Desktop (Linux, Windows, macOS)
-
-* Enable Desktop support in Flutter: https://flutter.dev/desktop
-
-#### Install custom dependencies (Linux)
-
-```bash
-sudo apt install libjsoncpp1 libsecret-1-dev libsecret-1-0 librhash0 libwebkit2gtk-4.0-dev lld
+```sh
+flutter run
 ```
 
-* Build with one of these:
-```bash
-flutter build linux --release
+检查代码：
+
+```sh
+flutter analyze
+flutter test
+```
+
+## 配置
+
+Web 端会读取站点根目录下的 `config.json`，完整示例见
+`config.sample.json`。只需要保留实际要覆盖的字段。
+
+语音转文字默认请求同源 `/api/transcribe`。AIHubMix 密钥必须作为服务端
+`AIHUBMIX_API_KEY` Secret 保存，禁止写入 Dart 源码、`config.json` 或 Git
+提交。
+
+## Android
+
+```sh
+flutter build apk --release
+```
+
+手机端需要使用已部署的转录代理时，传入完整地址：
+
+```sh
+flutter build apk --release \
+  --dart-define=VOICE_TRANSCRIPTION_ENDPOINT=https://你的域名/api/transcribe
+```
+
+## iOS / iPadOS
+
+需要 macOS、Xcode 和有效的 Apple 开发者签名：
+
+```sh
+./scripts/build-ios.sh
+```
+
+## Web
+
+正式构建前必须生成 Vodozemac WASM、`native_imaging` 和 LiveKit E2EE
+Worker，不能省略第一条命令：
+
+```sh
+./scripts/prepare-web.sh
+flutter build web --release \
+  --dart-define=FLUTTER_WEB_CANVASKIT_URL=canvaskit/
+```
+
+构建产物位于 `build/web`。Cloudflare 完整上线流程见
+[Cloudflare Pages 部署说明](docs/cloudflare-pages-zh.md)。
+
+## 桌面端
+
+```sh
 flutter build windows --release
 flutter build macos --release
+flutter build linux --release
 ```
 
-## How to run integration tests
-
-You need to have docker installed locally! Run the preparation script before every test run:
+Linux 构建前需要安装系统依赖：
 
 ```sh
-./scripts/prepare_integration_test.sh
+sudo apt install libjsoncpp1 libsecret-1-dev libsecret-1-0 \
+  librhash0 libwebkit2gtk-4.0-dev lld
 ```
 
-Then run all tests with:
+## 音频兼容说明
 
-```sh
-flutter test integration_test/mobile_test.dart
-```
+- Android/macOS 在编码器支持时发送 OGG/Opus。
+- iOS 因录音库的 Opus 兼容问题，保留 AAC-LC/M4A 回退。
+- Web 录音目前仍由原项目禁用。
+- 接收端会修正错误的 MIME 和扩展名，但最终解码能力仍取决于操作系统或浏览器。
+- AIHubMix 文档没有明确列出 OGG；当前代理会原样上传。如果供应商拒绝 OGG，
+  需要在支持 FFmpeg 的后端增加转码，不能在普通 Cloudflare Pages 静态环境完成。
 
+## 文档
 
-# Special thanks
+- [Cloudflare Pages 部署说明](docs/cloudflare-pages-zh.md)
+- [隐私说明](PRIVACY.md)
+- [安全说明](SECURITY.md)
+- `CHANGELOG.md` 为 FluffyChat 上游历史记录，保留原文以便追溯。
 
-* <a href="https://github.com/fabiyamada">Fabiyamada</a> is a graphics designer and has made the fluffychat logo and the banner. Big thanks for her great designs.
+## 致谢与许可
 
-* Also thanks to all translators and testers! With your help, fluffychat is now available in more than 12 languages.
-
-* The Matrix Foundation for making and maintaining the [emoji translations](https://github.com/matrix-org/matrix-spec/blob/main/data-definitions/sas-emoji.json) used for emoji verification, licensed Apache 2.0
-
-* Special thanks to MTRNord, Sorunome and Advocatux.
+感谢 FluffyChat、Matrix Foundation 及所有上游贡献者。本项目继续遵循
+`AGPL-3.0-or-later` 许可证，修改后对外提供网络服务时请同时遵守 AGPL 的源码
+公开要求。

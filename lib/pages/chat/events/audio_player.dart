@@ -9,17 +9,20 @@ import 'dart:io';
 import 'package:async/async.dart';
 import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/themes.dart';
-import 'package:fluffychat/utils/error_reporter.dart';
+import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/services/voice_transcription_service.dart';
 import 'package:fluffychat/utils/file_description.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/url_launcher.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 import 'package:ogg_caf_converter/ogg_caf_converter.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:universal_html/html.dart' as html;
 
 import '../../../utils/matrix_sdk_extensions/event_extension.dart';
 import '../../../widgets/fluffy_chat_app.dart';
@@ -56,6 +59,9 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
   late final MatrixState matrix;
   List<int>? _waveform;
   String? _durationString;
+  String? _transcription;
+  bool _isTranscribing = false;
+  bool _transcriptionExpanded = true;
 
   @override
   void dispose() {
@@ -104,6 +110,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                   onPressed: () {
                     audioPlayer.pause();
                     audioPlayer.dispose();
+                    matrix.revokeAudioObjectUrl();
                     matrix.voiceMessageEventId.value = matrix.audioPlayer =
                         null;
 
@@ -123,6 +130,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
       }
       audioPlayer.pause();
       audioPlayer.dispose();
+      matrix.revokeAudioObjectUrl();
       matrix.voiceMessageEventId.value = matrix.audioPlayer = null;
     }
   }
@@ -148,6 +156,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
     matrix.audioPlayer
       ?..stop()
       ..dispose();
+    matrix.revokeAudioObjectUrl();
     File? file;
     MatrixFile? matrixFile;
 
@@ -159,6 +168,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
       matrixFile = await widget.event.downloadAndDecryptAttachment(
         onDownloadProgress: fileSize != null && fileSize > 0
             ? (progress) {
+                if (!mounted) return;
                 final progressPercentage = progress / fileSize;
                 setState(() {
                   _downloadProgress = progressPercentage < 1
@@ -170,16 +180,16 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
       );
 
       final attachmentUrl = widget.event.attachmentOrThumbnailMxcUrl();
+      final audioFormat = _detectAudioFormat(matrixFile);
 
       if (!kIsWeb && attachmentUrl != null) {
         final tempDir = await getTemporaryDirectory();
         final fileName = Uri.encodeComponent(attachmentUrl.pathSegments.last);
-        file = File('${tempDir.path}/${fileName}_${matrixFile.name}');
+        file = File('${tempDir.path}/$fileName.${audioFormat.extension}');
 
         await file.writeAsBytes(matrixFile.bytes);
 
-        if (Platform.isIOS &&
-            matrixFile.mimeType.toLowerCase() == 'audio/ogg') {
+        if (Platform.isIOS && audioFormat.isOgg) {
           Logs().v('Convert ogg audio file for iOS...');
           final convertedFile = File('${file.path}.caf');
           if (await convertedFile.exists() == false) {
@@ -192,36 +202,169 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
         }
       }
 
+      if (!mounted) return;
       setState(() {
         status = AudioPlayerStatus.downloaded;
       });
     } catch (e, s) {
       Logs().v('Could not download audio file', e, s);
-      if (!mounted) rethrow;
+      if (!mounted) return;
+      setState(() => status = AudioPlayerStatus.notDownloaded);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
-      rethrow;
+      return;
     }
     if (!context.mounted) return;
     if (matrix.voiceMessageEventId.value != widget.event.eventId) return;
 
     final audioPlayer = matrix.audioPlayer = AudioPlayer();
 
-    if (file != null) {
-      audioPlayer.setFilePath(file.path);
-    } else {
-      await audioPlayer.setAudioSource(
-        AudioSource.uri(
-          Uri.dataFromBytes(matrixFile.bytes, mimeType: matrixFile.mimeType),
+    try {
+      if (file != null) {
+        // Loading must finish before play() is invoked. Not awaiting this was
+        // a race that mainly showed up as silent playback on slower phones.
+        await audioPlayer.setFilePath(file.path);
+      } else if (kIsWeb) {
+        final audioFormat = _detectAudioFormat(matrixFile);
+        final blob = html.Blob([matrixFile.bytes], audioFormat.mimeType);
+        final objectUrl = html.Url.createObjectUrlFromBlob(blob);
+        matrix.audioObjectUrl = objectUrl;
+        await audioPlayer.setUrl(objectUrl);
+      } else {
+        await audioPlayer.setAudioSource(
+          AudioSource.uri(
+            Uri.dataFromBytes(
+              matrixFile.bytes,
+              mimeType: _detectAudioFormat(matrixFile).mimeType,
+            ),
+          ),
+        );
+      }
+      if (!mounted) return;
+      await audioPlayer.play();
+    } catch (e, s) {
+      Logs().w('Unable to play audio message', e, s);
+      await audioPlayer.dispose();
+      matrix.revokeAudioObjectUrl();
+      matrix.voiceMessageEventId.value = matrix.audioPlayer = null;
+      if (!mounted) return;
+      setState(() => status = AudioPlayerStatus.notDownloaded);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
+    }
+  }
+
+  ({String extension, String mimeType, bool isOgg}) _detectAudioFormat(
+    MatrixFile file,
+  ) {
+    final bytes = file.bytes;
+    final declaredMime = file.mimeType.split(';').first.trim().toLowerCase();
+    final fileName = file.name.toLowerCase();
+
+    bool startsWith(List<int> signature, [int offset = 0]) {
+      if (bytes.length < signature.length + offset) return false;
+      for (var i = 0; i < signature.length; i++) {
+        if (bytes[offset + i] != signature[i]) return false;
+      }
+      return true;
+    }
+
+    if (startsWith(const [0x4f, 0x67, 0x67, 0x53])) {
+      return (extension: 'ogg', mimeType: 'audio/ogg', isOgg: true);
+    }
+    if (startsWith(const [0x52, 0x49, 0x46, 0x46]) &&
+        startsWith(const [0x57, 0x41, 0x56, 0x45], 8)) {
+      return (extension: 'wav', mimeType: 'audio/wav', isOgg: false);
+    }
+    if (startsWith(const [0x66, 0x4c, 0x61, 0x43])) {
+      return (extension: 'flac', mimeType: 'audio/flac', isOgg: false);
+    }
+    // ADTS AAC also starts with an MPEG-style 0xff sync byte, so it must be
+    // detected before the broader MP3 frame check below.
+    if (bytes.length >= 2 && bytes[0] == 0xff && (bytes[1] & 0xf6) == 0xf0) {
+      return (extension: 'aac', mimeType: 'audio/aac', isOgg: false);
+    }
+    if (startsWith(const [0x49, 0x44, 0x33]) ||
+        (bytes.length >= 2 && bytes[0] == 0xff && (bytes[1] & 0xe0) == 0xe0)) {
+      return (extension: 'mp3', mimeType: 'audio/mpeg', isOgg: false);
+    }
+    if (startsWith(const [0x1a, 0x45, 0xdf, 0xa3])) {
+      return (extension: 'webm', mimeType: 'audio/webm', isOgg: false);
+    }
+    if (startsWith(const [0x23, 0x21, 0x41, 0x4d, 0x52])) {
+      return (extension: 'amr', mimeType: 'audio/amr', isOgg: false);
+    }
+    if (startsWith(const [0x66, 0x74, 0x79, 0x70], 4)) {
+      return (extension: 'm4a', mimeType: 'audio/mp4', isOgg: false);
+    }
+
+    final isOgg =
+        declaredMime.contains('ogg') ||
+        fileName.endsWith('.ogg') ||
+        fileName.endsWith('.opus');
+    if (isOgg) {
+      return (extension: 'ogg', mimeType: 'audio/ogg', isOgg: true);
+    }
+
+    const mimeFormats = {
+      'audio/aac': ('aac', 'audio/aac'),
+      'audio/mp4': ('m4a', 'audio/mp4'),
+      'audio/mpeg': ('mp3', 'audio/mpeg'),
+      'audio/wav': ('wav', 'audio/wav'),
+      'audio/x-wav': ('wav', 'audio/wav'),
+      'audio/flac': ('flac', 'audio/flac'),
+      'audio/webm': ('webm', 'audio/webm'),
+      'audio/amr': ('amr', 'audio/amr'),
+      'audio/3gpp': ('3gp', 'audio/3gpp'),
+    };
+    final format = mimeFormats[declaredMime];
+    if (format != null) {
+      return (extension: format.$1, mimeType: format.$2, isOgg: false);
+    }
+
+    final extension = fileName.contains('.')
+        ? fileName.split('.').last.replaceAll(RegExp('[^a-z0-9]'), '')
+        : 'audio';
+    return (
+      extension: extension.isEmpty ? 'audio' : extension,
+      mimeType: declaredMime.isEmpty
+          ? 'application/octet-stream'
+          : declaredMime,
+      isOgg: false,
+    );
+  }
+
+  Future<void> _transcribe() async {
+    if (_isTranscribing) return;
+    setState(() => _isTranscribing = true);
+    try {
+      final audioFile = await widget.event.downloadAndDecryptAttachment();
+      final transcription = await const VoiceTranscriptionService().transcribe(
+        audioFile,
+      );
+      if (!mounted) return;
+      setState(() {
+        _transcription = transcription;
+        _transcriptionExpanded = true;
+      });
+    } on VoiceTranscriptionNotConfiguredException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(L10n.of(context).voiceTranscriptionNotConfigured),
         ),
       );
+    } catch (e, s) {
+      Logs().w('Unable to transcribe voice message', e, s);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(L10n.of(context).voiceTranscriptionFailed)),
+      );
+    } finally {
+      if (mounted) setState(() => _isTranscribing = false);
     }
-    if (!mounted) return;
-
-    audioPlayer.play().onError(
-      ErrorReporter(context, 'Unable to play audio message').onErrorCallback,
-    );
   }
 
   Future<void> _toggleSpeed() async {
@@ -306,6 +449,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = L10n.of(context);
     final waveform = _waveform;
 
     return ValueListenableBuilder(
@@ -499,6 +643,132 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 4),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: FluffyThemes.columnWidth,
+                    ),
+                    child: _isTranscribing
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox.square(
+                                  dimension: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: widget.color,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    l10n.transcribingVoiceMessage,
+                                    style: TextStyle(color: widget.color),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : _transcription == null
+                        ? Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: TextButton.icon(
+                              onPressed: _transcribe,
+                              icon: const Icon(Icons.text_snippet_outlined),
+                              label: Text(l10n.voiceToText),
+                              style: TextButton.styleFrom(
+                                foregroundColor: widget.color,
+                              ),
+                            ),
+                          )
+                        : Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 8),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: widget.color.withAlpha(24),
+                              borderRadius: BorderRadius.circular(
+                                AppConfig.borderRadius / 2,
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        l10n.voiceTranscription,
+                                        style: TextStyle(
+                                          color: widget.color,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      tooltip: l10n.copy,
+                                      onPressed: () async {
+                                        await Clipboard.setData(
+                                          ClipboardData(text: _transcription!),
+                                        );
+                                        if (!context.mounted) return;
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              l10n.copiedToClipboard,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.copy_outlined),
+                                      color: widget.color,
+                                    ),
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      tooltip: _transcriptionExpanded
+                                          ? l10n.collapse
+                                          : l10n.expand,
+                                      onPressed: () => setState(
+                                        () => _transcriptionExpanded =
+                                            !_transcriptionExpanded,
+                                      ),
+                                      icon: Icon(
+                                        _transcriptionExpanded
+                                            ? Icons.expand_less
+                                            : Icons.expand_more,
+                                      ),
+                                      color: widget.color,
+                                    ),
+                                  ],
+                                ),
+                                AnimatedSize(
+                                  duration: FluffyThemes.animationDuration,
+                                  curve: FluffyThemes.animationCurve,
+                                  child: _transcriptionExpanded
+                                      ? Padding(
+                                          padding: const EdgeInsets.all(8),
+                                          child: SelectableText(
+                                            _transcription!,
+                                            style: TextStyle(
+                                              color: widget.color,
+                                              fontSize: widget.fontSize,
+                                            ),
+                                          ),
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
+                            ),
+                          ),
                   ),
                   if (fileDescription != null) ...[
                     const SizedBox(height: 8),

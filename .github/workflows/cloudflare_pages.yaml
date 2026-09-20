@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: Deploy Web to Cloudflare Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: cloudflare-pages-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install web build prerequisites
+        run: |
+          rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+          sudo apt-get update
+          sudo apt-get install --yes jq build-essential
+
+      - name: Prepare web native modules
+        run: ./scripts/prepare-web.sh
+
+      - name: Build web release
+        run: >-
+          flutter build web
+          --release
+          --dart-define=FLUTTER_WEB_CANVASKIT_URL=canvaskit/
+
+      - name: Add runtime configuration
+        run: cp config.sample.json build/web/config.json
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy build/web --project-name=fluffychat

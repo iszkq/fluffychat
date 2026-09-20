@@ -2815,5 +2815,26 @@
         "placeholders": {
             "error": {"type": "String"}
         }
-    }
+    },
+    "forwardMessagesToChats": "Forward {messageCount, plural, =1{one message} other{{messageCount} messages}} to {chatCount, plural, =1{one chat} other{{chatCount} chats}}?",
+    "@forwardMessagesToChats": {
+        "placeholders": {
+            "messageCount": {"type": "int"},
+            "chatCount": {"type": "int"}
+        }
+    },
+    "unableToForwardMessages": "Unable to prepare the messages for forwarding.",
+    "forwardMessagesFailedForChats": "Could not forward to {count, plural, =1{one chat} other{{count} chats}}. The failed chats remain selected.",
+    "@forwardMessagesFailedForChats": {
+        "placeholders": {
+            "count": {"type": "int"}
+        }
+    },
+    "voiceToText": "Transcribe",
+    "transcribingVoiceMessage": "Transcribing voice message…",
+    "voiceTranscription": "Transcription",
+    "voiceTranscriptionFailed": "Unable to transcribe this voice message.",
+    "voiceTranscriptionNotConfigured": "Voice transcription is not configured for this build.",
+    "collapse": "Collapse",
+    "expand": "Expand"
 }

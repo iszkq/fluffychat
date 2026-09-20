@@ -64,6 +64,15 @@ void main(List<String> args) => runZonedGuarded(() async {
   // widget bindings are initialized already.
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Browsers have a much lower practical memory ceiling than native apps.
+  // CanvasKit, decrypted attachments and Flutter's default 100 MB image cache
+  // can otherwise push long media-heavy timelines over the tab limit.
+  if (kIsWeb) {
+    final imageCache = PaintingBinding.instance.imageCache;
+    imageCache.maximumSize = 200;
+    imageCache.maximumSizeBytes = 48 * 1024 * 1024;
+  }
+
   final store = await AppSettings.init();
   Logs().i('Welcome to ${AppSettings.applicationName.value} <3');
 

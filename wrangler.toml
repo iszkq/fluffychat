@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name = "fluffychat"
+compatibility_date = "2026-09-20"
+pages_build_output_dir = "build/web"

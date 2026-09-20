@@ -140,7 +140,15 @@ class MatrixState extends State<Matrix> {
   Client? _loginClientCandidate;
 
   AudioPlayer? audioPlayer;
+  String? audioObjectUrl;
   final ValueNotifier<String?> voiceMessageEventId = ValueNotifier(null);
+
+  void revokeAudioObjectUrl() {
+    final objectUrl = audioObjectUrl;
+    if (objectUrl == null) return;
+    if (kIsWeb) html.Url.revokeObjectUrl(objectUrl);
+    audioObjectUrl = null;
+  }
 
   Future<Client> getLoginClient() async {
     if (widget.clients.isNotEmpty && !client.isLogged()) {
@@ -273,9 +281,8 @@ class MatrixState extends State<Matrix> {
 
             if (!snackbarContext.mounted) return;
             final l10n = L10n.of(snackbarContext);
-            ScaffoldMessenger.of(
-              snackbarContext,
-            ).showSnackBar(SnackBar(content: Text(l10n.oneClientLoggedOut)));
+            ScaffoldMessenger.of(snackbarContext)
+                .showSnackBar(SnackBar(content: Text(l10n.oneClientLoggedOut)));
             return;
           }
           FluffyChatApp.router.go('/');
@@ -393,6 +400,8 @@ class MatrixState extends State<Matrix> {
     onUiaRequest.clear();
 
     voiceMessageEventId.dispose();
+    audioPlayer?.dispose();
+    revokeAudioObjectUrl();
 
     super.dispose();
   }

@@ -7,6 +7,8 @@ import 'package:cross_file/cross_file.dart';
 import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
+import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_file_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/avatar.dart';
@@ -14,6 +16,7 @@ import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
+import 'package:mime/mime.dart';
 
 abstract class ShareItem {}
 
@@ -44,35 +47,119 @@ class ShareScaffoldDialog extends StatefulWidget {
 class _ShareScaffoldDialogState extends State<ShareScaffoldDialog> {
   final TextEditingController _filterController = TextEditingController();
 
-  String? selectedRoomId;
+  final Set<String> selectedRoomIds = {};
+  bool _isForwarding = false;
 
   void _toggleRoom(String roomId) {
     setState(() {
-      selectedRoomId = roomId;
+      if (!selectedRoomIds.add(roomId)) {
+        selectedRoomIds.remove(roomId);
+      }
     });
   }
 
   Future<void> _forwardAction() async {
-    final roomId = selectedRoomId;
-    if (roomId == null) {
+    if (selectedRoomIds.isEmpty || _isForwarding) {
       throw Exception(
-        'Started forward action before room was selected. This should never happen.',
+        'Started forward action before a room was selected. This should never happen.',
       );
     }
-    if (widget.items.any((item) => item is! FileShareItem)) {
-      final consent = await showOkCancelAlertDialog(
-        context: context,
-        title: L10n.of(context).forwardCountMessages(widget.items.length),
-        okLabel: L10n.of(context).forward,
-        cancelLabel: L10n.of(context).cancel,
-      );
-      if (consent != OkCancelResult.ok) return;
+
+    final l10n = L10n.of(context);
+    final consent = await showOkCancelAlertDialog(
+      context: context,
+      title: l10n.forwardMessagesToChats(
+        widget.items.length,
+        selectedRoomIds.length,
+      ),
+      okLabel: l10n.forward,
+      cancelLabel: l10n.cancel,
+    );
+    if (consent != OkCancelResult.ok || !mounted) return;
+
+    setState(() => _isForwarding = true);
+
+    // Read shared files once. The same in-memory MatrixFile can then be
+    // uploaded independently to every selected room.
+    final files = <MatrixFile>[];
+    try {
+      for (final item in widget.items.whereType<FileShareItem>()) {
+        final bytes = await item.value.readAsBytes();
+        final mimeType =
+            item.value.mimeType ??
+            lookupMimeType(item.value.name, headerBytes: bytes);
+        files.add(
+          MatrixFile(
+            bytes: bytes,
+            name: item.value.name,
+            mimeType: mimeType,
+          ).detectFileType,
+        );
+      }
+    } catch (e, s) {
+      Logs().w('Unable to prepare shared files for forwarding', e, s);
+      if (!mounted) return;
+      setState(() => _isForwarding = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.unableToForwardMessages)));
+      return;
     }
+
     if (!mounted) return;
-    while (context.canPop()) {
-      context.pop();
+    final client = Matrix.of(context).client;
+    final failedRoomIds = <String>{};
+    for (final roomId in selectedRoomIds) {
+      final room = client.getRoomById(roomId);
+      if (room == null) {
+        failedRoomIds.add(roomId);
+        continue;
+      }
+
+      try {
+        if (!mounted) return;
+        final proceed = await showTrustUserInRoomDialog(context, room);
+        if (!mounted) return;
+        if (!proceed) {
+          failedRoomIds.add(roomId);
+          continue;
+        }
+
+        for (final item in widget.items) {
+          if (item is TextShareItem) {
+            await room.sendTextEvent(item.value);
+          } else if (item is ContentShareItem) {
+            await room.sendEvent(item.value.copy());
+          }
+        }
+        for (final file in files) {
+          await room.sendFileEvent(file);
+        }
+      } catch (e, s) {
+        Logs().w('Unable to forward messages to room $roomId', e, s);
+        failedRoomIds.add(roomId);
+      }
     }
-    context.go('/rooms/$roomId', extra: widget.items);
+
+    if (!mounted) return;
+    if (failedRoomIds.isNotEmpty) {
+      setState(() {
+        selectedRoomIds
+          ..clear()
+          ..addAll(failedRoomIds);
+        _isForwarding = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.forwardMessagesFailedForChats(failedRoomIds.length),
+          ),
+        ),
+      );
+      return;
+    }
+
+    context.pop();
   }
 
   @override
@@ -141,7 +228,7 @@ class _ShareScaffoldDialogState extends State<ShareScaffoldDialog> {
               final displayname = room.getLocalizedDisplayname(
                 MatrixLocals(L10n.of(context)),
               );
-              final value = selectedRoomId == room.id;
+              final value = selectedRoomIds.contains(room.id);
               final filterOut = !displayname.toLowerCase().contains(filter);
               if (!value && filterOut) {
                 return const SizedBox.shrink();
@@ -181,8 +268,10 @@ class _ShareScaffoldDialogState extends State<ShareScaffoldDialog> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      value: selectedRoomId == room.id,
-                      onChanged: (_) => _toggleRoom(room.id),
+                      value: selectedRoomIds.contains(room.id),
+                      onChanged: _isForwarding
+                          ? null
+                          : (_) => _toggleRoom(room.id),
                     ),
                   ),
                 ),
@@ -194,7 +283,7 @@ class _ShareScaffoldDialogState extends State<ShareScaffoldDialog> {
       bottomNavigationBar: AnimatedSize(
         duration: FluffyThemes.animationDuration,
         curve: FluffyThemes.animationCurve,
-        child: selectedRoomId == null
+        child: selectedRoomIds.isEmpty
             ? const SizedBox.shrink()
             : Material(
                 elevation: 8,
@@ -203,8 +292,15 @@ class _ShareScaffoldDialogState extends State<ShareScaffoldDialog> {
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: ElevatedButton(
-                      onPressed: _forwardAction,
-                      child: Text(L10n.of(context).forward),
+                      onPressed: _isForwarding ? null : _forwardAction,
+                      child: _isForwarding
+                          ? const SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              '${L10n.of(context).forward} (${selectedRoomIds.length})',
+                            ),
                     ),
                   ),
                 ),
