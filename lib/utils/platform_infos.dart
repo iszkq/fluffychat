@@ -40,8 +40,8 @@ abstract class PlatformInfos {
   static bool get supportsCustomImageResizer =>
       PlatformInfos.isWeb || PlatformInfos.isMobile;
 
-  /// Browsers record Opus in a WebM container. The send path detects the real
-  /// container instead of labelling it as OGG.
+  /// Web records PCM and encodes it as OGG/Opus with the bundled WebAssembly
+  /// codec; mobile platforms record Opus using their native audio APIs.
   static bool get platformCanRecord => isWeb || isMobile || isMacOS;
 
   static bool get supportsEmbeddedOffice => isWeb || isMobile;

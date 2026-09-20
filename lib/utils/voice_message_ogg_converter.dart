@@ -5,13 +5,20 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
-/// Repackages Opus recordings into an OGG container without re-encoding.
+import 'package:fluffychat/utils/voice_message_ogg_encoder.dart';
+
+/// Converts supported voice recordings into an OGG/Opus stream.
 ///
-/// Browsers expose Opus in WebM and Apple platforms expose Opus in CAF. Matrix
-/// clients such as Element X expect voice messages to use OGG/Opus, so merely
-/// changing the extension is not sufficient.
-Uint8List normalizeVoiceMessageToOgg(Uint8List bytes) {
+/// Web PCM/WAV is encoded with the bundled WebAssembly codec. Existing WebM
+/// and Apple CAF Opus recordings are repackaged without re-encoding. Matrix
+/// clients such as Element X expect actual OGG/Opus data, so merely changing
+/// the extension is not sufficient.
+Future<Uint8List> normalizeVoiceMessageToOgg(Uint8List bytes) async {
   if (_startsWith(bytes, const [0x4f, 0x67, 0x67, 0x53])) return bytes;
+  if (_startsWith(bytes, const [0x52, 0x49, 0x46, 0x46]) &&
+      _startsWith(bytes, const [0x57, 0x41, 0x56, 0x45], 8)) {
+    return encodeWavVoiceMessageToOgg(bytes);
+  }
   if (_startsWith(bytes, const [0x1a, 0x45, 0xdf, 0xa3])) {
     return _WebmOpusReader(bytes).convert();
   }
@@ -22,6 +29,22 @@ Uint8List normalizeVoiceMessageToOgg(Uint8List bytes) {
     'The recording is not OGG, WebM/Opus or CAF/Opus',
   );
 }
+
+/// Packages already-encoded Opus packets into an OGG stream.
+///
+/// This is public so the WebAssembly encoder can share the same tested OGG
+/// writer as the WebM and CAF repackaging paths.
+Uint8List packageOpusPacketsAsOgg({
+  required List<Uint8List> packets,
+  required int channels,
+  required int inputSampleRate,
+  required int validSamplesPerChannel,
+  int preSkip = 312,
+}) => _OpusStream(
+  head: _createOpusHead(channels, preSkip, inputSampleRate),
+  packets: packets,
+  finalGranulePosition: preSkip + validSamplesPerChannel,
+).toOgg();
 
 bool _startsWith(Uint8List bytes, List<int> signature, [int offset = 0]) {
   if (bytes.length < offset + signature.length) return false;
@@ -510,7 +533,14 @@ Uint8List _buildOggPage({
   page[4] = 0;
   page[5] = headerType;
   final data = ByteData.sublistView(page);
-  data.setUint64(6, granulePosition, Endian.little);
+  // ByteData.setUint64 throws at runtime in dart2js. OGG stores the granule
+  // position as two little-endian 32-bit words, which is also safe on Web.
+  data.setUint32(6, granulePosition.toUnsigned(32), Endian.little);
+  data.setUint32(
+    10,
+    (granulePosition ~/ 0x100000000).toUnsigned(32),
+    Endian.little,
+  );
   data.setUint32(14, serial, Endian.little);
   data.setUint32(18, sequence, Endian.little);
   data.setUint32(22, 0, Endian.little);

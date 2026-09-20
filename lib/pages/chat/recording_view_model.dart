@@ -64,12 +64,12 @@ class RecordingViewModelState extends State<RecordingViewModel> {
     setState(() {});
 
     try {
-      const codec = AudioEncoder.opus;
+      const codec = kIsWeb ? AudioEncoder.wav : AudioEncoder.opus;
       if (!await audioRecorder.isEncoderSupported(codec)) {
         throw const FormatException('Opus recording is not supported');
       }
       final extension = kIsWeb
-          ? 'webm'
+          ? 'wav'
           : PlatformInfos.isIOS || PlatformInfos.isMacOS
           ? 'caf'
           : codec.fileExtension;
@@ -96,8 +96,10 @@ class RecordingViewModelState extends State<RecordingViewModel> {
       await audioRecorder.start(
         RecordConfig(
           bitRate: AppSettings.audioRecordingBitRate.value,
-          sampleRate: AppSettings.audioRecordingSamplingRate.value,
-          numChannels: AppSettings.audioRecordingNumChannels.value,
+          sampleRate: kIsWeb
+              ? 48000
+              : AppSettings.audioRecordingSamplingRate.value,
+          numChannels: kIsWeb ? 1 : AppSettings.audioRecordingNumChannels.value,
           autoGain: AppSettings.audioRecordingAutoGain.value,
           echoCancel: AppSettings.audioRecordingEchoCancel.value,
           noiseSuppress: AppSettings.audioRecordingNoiseSuppress.value,

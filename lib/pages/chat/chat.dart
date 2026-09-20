@@ -926,7 +926,7 @@ class ChatController extends State<ChatPageWithRoom>
     if (bytes == null) return;
 
     try {
-      bytes = normalizeVoiceMessageToOgg(bytes);
+      bytes = await normalizeVoiceMessageToOgg(bytes);
     } catch (error, stackTrace) {
       Logs().w('Unable to convert voice message to OGG', error, stackTrace);
       if (!mounted) return;

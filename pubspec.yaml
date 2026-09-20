@@ -74,6 +74,8 @@ dependencies:
   mime: ^2.1.0
   native_imaging: ^0.5.0
   ogg_caf_converter: ^0.1.4
+  opus_codec_dart: ^3.0.5
+  opus_codec_web: ^3.0.5
   package_info_plus: ^10.2.0
   particles_network: ^1.9.5
   pasteboard: ^0.5.0
