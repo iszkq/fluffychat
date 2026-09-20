@@ -29,7 +29,10 @@ enum AppSettings<T> {
   unifiedPushEndpoint<String>('chat.fluffy.unifiedpush.endpoint', ''),
   pushNotificationsGatewayUrl<String>(
     'pushNotificationsGatewayUrl',
-    'https://push.fluffychat.im/_matrix/push/v1/notify',
+    String.fromEnvironment(
+      'PUSH_NOTIFICATIONS_GATEWAY_URL',
+      defaultValue: 'https://push.fluffychat.im/_matrix/push/v1/notify',
+    ),
   ),
   pushNotificationsPusherFormat<String>(
     'pushNotificationsPusherFormat',
