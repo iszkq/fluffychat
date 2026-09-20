@@ -9,6 +9,7 @@ on:
       voice_transcription_endpoint:
         description: Full Cloudflare URL ending in /api/transcribe
         required: true
+        default: https://flchat.221819.best/api/transcribe
         type: string
       office_editor_url:
         description: Office editor base URL (HTTPS, without /editor)
