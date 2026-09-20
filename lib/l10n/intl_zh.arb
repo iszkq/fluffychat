@@ -2041,6 +2041,7 @@
         }
     },
     "sendReadReceipts": "发送已读回执",
+    "readBy": "已读成员",
     "formattedMessages": "格式化的消息",
     "verifyOtherDevice": "🔐 验证其它设备",
     "verifyOtherUser": "🔐 验证其他用户",

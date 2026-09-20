@@ -2170,6 +2170,7 @@
         }
     },
     "sendReadReceipts": "Send read receipts",
+    "readBy": "Read by",
     "sendTypingNotificationsDescription": "Other participants in a chat can see when you are typing a new message.",
     "sendReadReceiptsDescription": "Other participants in a chat can see when you have read a message.",
     "formattedMessages": "Formatted messages",
