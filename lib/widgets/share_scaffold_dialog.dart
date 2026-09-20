@@ -27,7 +27,9 @@ class TextShareItem extends ShareItem {
 
 class ContentShareItem extends ShareItem {
   final Map<String, Object?> value;
-  ContentShareItem(this.value);
+  final String eventType;
+
+  ContentShareItem(this.value, {this.eventType = EventTypes.Message});
 }
 
 class FileShareItem extends ShareItem {
@@ -129,7 +131,7 @@ class _ShareScaffoldDialogState extends State<ShareScaffoldDialog> {
           if (item is TextShareItem) {
             await room.sendTextEvent(item.value);
           } else if (item is ContentShareItem) {
-            await room.sendEvent(item.value.copy());
+            await room.sendEvent(item.value.copy(), type: item.eventType);
           }
         }
         for (final file in files) {

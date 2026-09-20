@@ -317,7 +317,9 @@ class ChatController extends State<ChatPageWithRoom>
     for (final item in shareItems) {
       if (item is FileShareItem) continue;
       if (item is TextShareItem) room.sendTextEvent(item.value);
-      if (item is ContentShareItem) room.sendEvent(item.value.copy());
+      if (item is ContentShareItem) {
+        room.sendEvent(item.value.copy(), type: item.eventType);
+      }
     }
     final files = shareItems
         .whereType<FileShareItem>()
@@ -1242,7 +1244,10 @@ class ChatController extends State<ChatPageWithRoom>
       context: context,
       builder: (context) => ShareScaffoldDialog(
         items: forwardEvents
-            .map((event) => ContentShareItem(event.content.copy()))
+            .map(
+              (event) =>
+                  ContentShareItem(event.content.copy(), eventType: event.type),
+            )
             .toList(),
       ),
     );

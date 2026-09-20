@@ -21,6 +21,15 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'events/audio_player.dart';
 
+const _opusSampleRates = <int>[8000, 12000, 16000, 24000, 48000];
+
+int _opusCompatibleSampleRate(int requested) => _opusSampleRates.reduce(
+  (current, candidate) =>
+      (candidate - requested).abs() < (current - requested).abs()
+      ? candidate
+      : current,
+);
+
 class RecordingViewModel extends StatefulWidget {
   final Widget Function(BuildContext, RecordingViewModelState) builder;
 
@@ -98,7 +107,9 @@ class RecordingViewModelState extends State<RecordingViewModel> {
           bitRate: AppSettings.audioRecordingBitRate.value,
           sampleRate: kIsWeb
               ? 48000
-              : AppSettings.audioRecordingSamplingRate.value,
+              : _opusCompatibleSampleRate(
+                  AppSettings.audioRecordingSamplingRate.value,
+                ),
           numChannels: kIsWeb ? 1 : AppSettings.audioRecordingNumChannels.value,
           autoGain: AppSettings.audioRecordingAutoGain.value,
           echoCancel: AppSettings.audioRecordingEchoCancel.value,

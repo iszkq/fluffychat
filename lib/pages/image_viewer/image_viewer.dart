@@ -117,8 +117,11 @@ class ImageViewerController extends State<ImageViewer> {
   /// Forward this image to another room.
   void forwardAction() => showScaffoldDialog(
     context: context,
-    builder: (context) =>
-        ShareScaffoldDialog(items: [ContentShareItem(currentEvent.content)]),
+    builder: (context) => ShareScaffoldDialog(
+      items: [
+        ContentShareItem(currentEvent.content, eventType: currentEvent.type),
+      ],
+    ),
   );
 
   /// Save this file with a system call.
