@@ -29,7 +29,10 @@ Future<void> openOfficeDocument(BuildContext context, Event event) async {
   final result = await event.getFile(context);
   final file = result.asValue?.value;
   if (file == null || !context.mounted) return;
-  await Navigator.of(context).push<void>(
+  // Keep the editor above the responsive room shell. On wide landscape
+  // phones the room shell switches to its two-column layout; a route pushed
+  // onto that nested navigator would otherwise be disposed during rotation.
+  await Navigator.of(context, rootNavigator: true).push<void>(
     MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => OfficeEditorPage(file: file, room: event.room),
@@ -303,6 +306,7 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
 
   @override
   Widget build(BuildContext context) {
+    final compact = MediaQuery.sizeOf(context).shortestSide < 600;
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -324,17 +328,27 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
                 : null,
             icon: const Icon(Icons.download_outlined),
           ),
-          TextButton.icon(
-            onPressed: _opened && !_saving
-                ? () => _export(_ExportAction.send)
-                : null,
-            icon: const Icon(Icons.send_outlined),
-            label: Text(_strings.sendToChat),
-          ),
+          if (compact)
+            IconButton(
+              tooltip: _strings.sendToChat,
+              onPressed: _opened && !_saving
+                  ? () => _export(_ExportAction.send)
+                  : null,
+              icon: const Icon(Icons.send_outlined),
+            )
+          else
+            TextButton.icon(
+              onPressed: _opened && !_saving
+                  ? () => _export(_ExportAction.send)
+                  : null,
+              icon: const Icon(Icons.send_outlined),
+              label: Text(_strings.sendToChat),
+            ),
           const SizedBox(width: 8),
         ],
       ),
       body: Stack(
+        fit: StackFit.expand,
         children: [
           OfficeEditorPlatformView(
             onSendReady: _onSendReady,
