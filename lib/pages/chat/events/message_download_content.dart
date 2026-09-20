@@ -4,9 +4,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/config/app_config.dart';
+import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/events/file_send_status_indicator.dart';
+import 'package:fluffychat/pages/office_editor/office_editor.dart';
 import 'package:fluffychat/utils/file_description.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
+import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/url_launcher.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:material_ui/material_ui.dart';
@@ -37,6 +40,8 @@ class MessageDownloadContent extends StatelessWidget {
     final sizeString = event.sizeString ?? '?MB';
     final fileDescription = event.fileDescription;
     final fileSendingStatus = event.fileSendingStatus;
+    final officeDocument =
+        PlatformInfos.supportsEmbeddedOffice && isOfficeDocument(filename);
     return Column(
       mainAxisSize: .min,
       crossAxisAlignment: .start,
@@ -46,7 +51,9 @@ class MessageDownloadContent extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(AppConfig.borderRadius / 2),
-            onTap: () => event.saveFile(context),
+            onTap: officeDocument && fileSendingStatus == null
+                ? () => openOfficeDocument(context, event)
+                : () => event.saveFile(context),
             child: Container(
               width: 400,
               padding: const EdgeInsets.all(16.0),
@@ -89,6 +96,12 @@ class MessageDownloadContent extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (officeDocument && fileSendingStatus == null)
+                    IconButton(
+                      tooltip: L10n.of(context).saveFile,
+                      onPressed: () => event.saveFile(context),
+                      icon: Icon(Icons.download_outlined, color: textColor),
+                    ),
                 ],
               ),
             ),

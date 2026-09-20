@@ -1,0 +1,133 @@
+<!--
+  SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
+  SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Office Editor</title>
+  <style>
+    html, body, #editor { width: 100%; height: 100%; margin: 0; border: 0; overflow: hidden; background: #f5f5f5; }
+  </style>
+</head>
+<body>
+  <iframe id="editor" allow="clipboard-read; clipboard-write" referrerpolicy="no-referrer"></iframe>
+  <script>
+    (() => {
+      'use strict';
+      const frame = document.getElementById('editor');
+      let config = null;
+      let editorOrigin = null;
+
+      const parseMessage = (value) => {
+        if (typeof value === 'string') {
+          try { return JSON.parse(value); } catch (_) { return null; }
+        }
+        return value && typeof value === 'object' ? value : null;
+      };
+
+      const emit = (message) => {
+        const payload = JSON.stringify(message);
+        if (window.FluffyOfficeBridge && typeof window.FluffyOfficeBridge.postMessage === 'function') {
+          window.FluffyOfficeBridge.postMessage(payload);
+        } else if (window.parent !== window && config && config.parentOrigin) {
+          window.parent.postMessage(payload, config.parentOrigin);
+        }
+      };
+
+      const emitSaved = async (message) => {
+        const bytes = new Uint8Array(message.buffer);
+        const chunkSize = 48 * 1024;
+        const chunkCount = Math.ceil(bytes.byteLength / chunkSize);
+        emit({
+          type: 'fluffy-office-saved-begin',
+          requestId: config.requestId,
+          saveId: message.saveId,
+          fileName: message.fileName,
+          mimeType: message.mimeType,
+          byteLength: bytes.byteLength,
+          chunkCount
+        });
+        for (let index = 0; index < chunkCount; index += 1) {
+          const slice = bytes.subarray(index * chunkSize, Math.min(bytes.byteLength, (index + 1) * chunkSize));
+          let binary = '';
+          for (let offset = 0; offset < slice.length; offset += 0x2000) {
+            binary += String.fromCharCode(...slice.subarray(offset, Math.min(slice.length, offset + 0x2000)));
+          }
+          emit({
+            type: 'fluffy-office-saved-chunk',
+            requestId: config.requestId,
+            saveId: message.saveId,
+            chunkIndex: index,
+            chunkData: btoa(binary)
+          });
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+        emit({
+          type: 'fluffy-office-saved-end',
+          requestId: config.requestId,
+          saveId: message.saveId
+        });
+      };
+
+      const initialize = (message) => {
+        if (!message.requestId || !message.editorUrl || !message.parentOrigin) return;
+        config = message;
+        try {
+          const editorUrl = new URL(message.editorUrl);
+          editorOrigin = editorUrl.origin;
+          const editor = new URL('/editor', editorUrl);
+          editor.searchParams.set('embed', '1');
+          editor.searchParams.set('requestId', message.requestId);
+          editor.searchParams.set('parentOrigin', window.location.origin);
+          editor.searchParams.set('editing', message.editing === false ? '0' : '1');
+          editor.searchParams.set('lang', message.lang || 'zh-CN');
+          editor.searchParams.set('theme', message.theme || 'light');
+          editor.searchParams.set('mobile', message.mobile ? '1' : '0');
+          editor.searchParams.set('compactToolbar', message.mobile ? '1' : '0');
+          frame.src = editor.toString();
+        } catch (error) {
+          emit({ type: 'xinghuo-office-error', requestId: message.requestId, message: String(error) });
+        }
+      };
+
+      const receive = (raw) => {
+        const message = parseMessage(raw);
+        if (!message) return;
+        if (message.type === 'fluffy-office-init') {
+          initialize(message);
+          return;
+        }
+        if (!config || message.requestId !== config.requestId || !frame.contentWindow || !editorOrigin) return;
+        frame.contentWindow.postMessage(message, editorOrigin);
+      };
+
+      window.fluffyOfficeReceive = receive;
+      window.addEventListener('message', (event) => {
+        const message = parseMessage(event.data);
+        if (!message) return;
+        if (!config) {
+          if (event.source === window.parent && message.type === 'fluffy-office-init') receive(message);
+          return;
+        }
+        if (event.source === window.parent && event.origin === config.parentOrigin) {
+          receive(message);
+          return;
+        }
+        if (event.source !== frame.contentWindow || event.origin !== editorOrigin || message.requestId !== config.requestId) return;
+        if (message.type === 'xinghuo-office-saved' && message.buffer instanceof ArrayBuffer) {
+          emitSaved(message).catch((error) => emit({
+            type: 'xinghuo-office-error',
+            requestId: config.requestId,
+            message: String(error)
+          }));
+          return;
+        }
+        emit(message);
+      });
+    })();
+  </script>
+</body>
+</html>

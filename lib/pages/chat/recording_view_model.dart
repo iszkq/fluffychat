@@ -70,8 +70,11 @@ class RecordingViewModelState extends State<RecordingViewModel> {
               await audioRecorder.isEncoderSupported(AudioEncoder.opus)
           ? AudioEncoder.opus
           : AudioEncoder.aacLc;
+      final extension = kIsWeb && codec == AudioEncoder.opus
+          ? 'webm'
+          : codec.fileExtension;
       fileName =
-          'voice_message_${DateTime.now().millisecondsSinceEpoch}.${codec.fileExtension}';
+          'voice_message_${DateTime.now().millisecondsSinceEpoch}.$extension';
       String? path;
       if (!kIsWeb) {
         final tempDir = await getTemporaryDirectory();

@@ -26,6 +26,7 @@ import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call.dart
 import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/filtered_timeline_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
+import 'package:fluffychat/utils/object_url.dart';
 import 'package:fluffychat/utils/other_party_can_receive.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/show_scaffold_dialog.dart';
@@ -921,10 +922,15 @@ class ChatController extends State<ChatPageWithRoom>
       future: audioFile.readAsBytes,
     );
     final bytes = bytesResult.result;
+    revokeObjectUrl(path);
     if (bytes == null) return;
 
-    final mimeType = lookupMimeType(fileName, headerBytes: bytes);
-    final extension = mimeType == null ? null : extensionFromMime(mimeType);
+    final mimeType = _detectVoiceMessageMimeType(bytes, fileName);
+    final extension = switch (mimeType) {
+      'audio/webm' => 'webm',
+      'audio/mp4' => 'm4a',
+      _ => mimeType == null ? null : extensionFromMime(mimeType),
+    };
     if (extension != null) {
       fileName =
           'voice_message_${DateTime.now().millisecondsSinceEpoch}.$extension';
@@ -961,6 +967,28 @@ class ChatController extends State<ChatPageWithRoom>
       replyEvent = null;
     });
     return;
+  }
+
+  String? _detectVoiceMessageMimeType(Uint8List bytes, String fileName) {
+    bool startsWith(List<int> signature, [int offset = 0]) =>
+        bytes.length >= offset + signature.length &&
+        List.generate(
+          signature.length,
+          (index) => bytes[offset + index] == signature[index],
+        ).every((matches) => matches);
+
+    if (startsWith(const [0x4F, 0x67, 0x67, 0x53])) return 'audio/ogg';
+    if (startsWith(const [0x1A, 0x45, 0xDF, 0xA3])) return 'audio/webm';
+    if (startsWith(const [0x66, 0x74, 0x79, 0x70], 4)) return 'audio/mp4';
+    if (startsWith(const [0x52, 0x49, 0x46, 0x46]) &&
+        startsWith(const [0x57, 0x41, 0x56, 0x45], 8)) {
+      return 'audio/wav';
+    }
+    if (startsWith(const [0x49, 0x44, 0x33]) ||
+        (bytes.length >= 2 && bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0)) {
+      return 'audio/mpeg';
+    }
+    return lookupMimeType(fileName, headerBytes: bytes);
   }
 
   void hideEmojiPicker() {

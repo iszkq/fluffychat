@@ -71,6 +71,15 @@ Web 端会读取站点根目录下的 `config.json`，完整示例见
 `AIHUBMIX_API_KEY` Secret 保存，禁止写入 Dart 源码、`config.json` 或 Git
 提交。
 
+Office 在线预览/编辑支持 DOC、DOCX、XLS、XLSX、PPT、PPTX 和 PDF。聊天中的
+Office 文件点击后会在内嵌编辑器中打开，可下载编辑后的副本，或将新版本重新
+发送到当前聊天。编辑器地址通过 `officeEditorUrl` 配置；必须使用浏览器和手机
+都信任的 HTTPS 证书，并允许被 iframe/WebView 嵌入。
+
+Web 端支持直接录制语音。Chrome/Firefox 会发送浏览器实际生成的 WebM/Opus，
+Android/macOS 仍保持 OGG/Opus，避免把 WebM 错标成 OGG 后导致其他客户端无法
+播放。首次使用时需要允许站点访问麦克风。
+
 ## Android
 
 ```sh
@@ -78,14 +87,16 @@ flutter build apk --release
 ```
 
 也可以在 GitHub 仓库的 Actions 页面手动运行 `Build Mobile Packages`，输入
-完整的 Cloudflare 转录接口地址后下载测试 APK。该 APK 使用调试签名，仅用于
-直接安装和功能测试；上架应用商店前必须配置自己的长期签名证书。
+完整的 Cloudflare 转录接口地址和 Office 编辑器地址后下载测试 APK。该 APK
+使用调试签名，仅用于直接安装和功能测试；上架应用商店前必须配置自己的长期
+签名证书。
 
 手机端需要使用已部署的转录代理时，传入完整地址：
 
 ```sh
 flutter build apk --release \
-  --dart-define=VOICE_TRANSCRIPTION_ENDPOINT=https://你的域名/api/transcribe
+  --dart-define=VOICE_TRANSCRIPTION_ENDPOINT=https://你的域名/api/transcribe \
+  --dart-define=OFFICE_EDITOR_URL=https://你的Office域名
 ```
 
 ## iOS / iPadOS

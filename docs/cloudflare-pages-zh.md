@@ -18,6 +18,9 @@ Vodozemac WASM、`native_imaging` 与 LiveKit E2EE Worker。
 4. 把 AIHubMix 密钥保存为 Cloudflare Pages secret，变量名必须为
    `AIHUBMIX_API_KEY`。不要把密钥写入 `config.json`、Dart 源码或 GitHub
    仓库。
+5. 如需更换 Office 服务地址，在站点根目录的 `config.json` 中设置
+   `officeEditorUrl`。该地址必须使用有效 HTTPS 证书；Office 服务还需允许
+   Cloudflare Pages 域名通过 iframe 嵌入。
 
 ## 部署
 
@@ -30,7 +33,8 @@ Cloudflare API Token。
 
 ```sh
 flutter build apk --release \
-  --dart-define=VOICE_TRANSCRIPTION_ENDPOINT=https://你的域名/api/transcribe
+  --dart-define=VOICE_TRANSCRIPTION_ENDPOINT=https://你的域名/api/transcribe \
+  --dart-define=OFFICE_EDITOR_URL=https://你的Office域名
 ```
 
 Web 端默认使用同源 `/api/transcribe`，无需在前端配置 API 密钥。

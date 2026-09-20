@@ -10,6 +10,11 @@ on:
         description: Full Cloudflare URL ending in /api/transcribe
         required: true
         type: string
+      office_editor_url:
+        description: Office editor base URL (HTTPS, without /editor)
+        required: true
+        default: https://124.222.193.241:6258
+        type: string
 
 permissions:
   contents: read
@@ -36,11 +41,13 @@ jobs:
       - name: Build installable APK
         env:
           VOICE_TRANSCRIPTION_ENDPOINT: ${{ inputs.voice_transcription_endpoint }}
+          OFFICE_EDITOR_URL: ${{ inputs.office_editor_url }}
         run: >-
           flutter build apk
           --debug
           --target-platform android-arm,android-arm64
           --dart-define="VOICE_TRANSCRIPTION_ENDPOINT=${VOICE_TRANSCRIPTION_ENDPOINT}"
+          --dart-define="OFFICE_EDITOR_URL=${OFFICE_EDITOR_URL}"
 
       - name: Rename APK
         run: cp build/app/outputs/flutter-apk/app-debug.apk fluffychat-android-test.apk
@@ -77,11 +84,13 @@ jobs:
       - name: Build iOS app without signing
         env:
           VOICE_TRANSCRIPTION_ENDPOINT: ${{ inputs.voice_transcription_endpoint }}
+          OFFICE_EDITOR_URL: ${{ inputs.office_editor_url }}
         run: >-
           flutter build ios
           --release
           --no-codesign
           --dart-define="VOICE_TRANSCRIPTION_ENDPOINT=${VOICE_TRANSCRIPTION_ENDPOINT}"
+          --dart-define="OFFICE_EDITOR_URL=${OFFICE_EDITOR_URL}"
 
       - name: Package unsigned IPA
         run: |

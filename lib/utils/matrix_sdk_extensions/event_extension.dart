@@ -13,7 +13,7 @@ import 'package:matrix/matrix.dart';
 import 'matrix_file_extension.dart';
 
 extension LocalizedBody on Event {
-  Future<async.Result<MatrixFile?>> _getFile(BuildContext context) =>
+  Future<async.Result<MatrixFile?>> getFile(BuildContext context) =>
       showFutureLoadingDialog(
         context: context,
         futureWithProgress: (onProgress) {
@@ -29,14 +29,14 @@ extension LocalizedBody on Event {
       );
 
   Future<void> saveFile(BuildContext context) async {
-    final matrixFile = await _getFile(context);
+    final matrixFile = await getFile(context);
     if (!context.mounted) return;
 
     matrixFile.result?.save(context);
   }
 
   Future<void> shareFile(BuildContext context) async {
-    final matrixFile = await _getFile(context);
+    final matrixFile = await getFile(context);
     if (!context.mounted) return;
 
     matrixFile.result?.share(context);

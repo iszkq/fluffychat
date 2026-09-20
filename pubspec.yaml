@@ -66,7 +66,9 @@ dependencies:
   matrix: #^11.0.0
     git:
       url: https://github.com/famedly/matrix-dart-sdk.git
-      ref: krille/refactor-device-keys-list-storing
+      # The branch is force-pushed upstream. Pin a reachable revision so clean
+      # GitHub Actions builds do not fail when an old commit disappears.
+      ref: 167e2522c3378c7d0cf1373f587c0decc376bca1
   media_kit_libs_linux: ^1.2.1
   media_kit_libs_windows_audio: ^1.0.9
   mime: ^2.1.0
@@ -99,6 +101,8 @@ dependencies:
   uuid: ^4.6.0
   video_player: ^2.14.0
   wakelock_plus: ^1.8.0
+  web: ^1.1.1
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   dart_code_linter: ^4.3.0
@@ -115,6 +119,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+    - assets/office/
     - assets/logo/mini/
     - assets/sounds/
     - assets/vodozemac/0.8.1/

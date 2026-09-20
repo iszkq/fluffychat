@@ -95,6 +95,13 @@ enum AppSettings<T> {
   cloudStickerIndexUrl<String>(
     'cloudStickerIndexUrl',
     'https://image.527012.xyz/index.json',
+  ),
+  officeEditorUrl<String>(
+    'officeEditorUrl',
+    String.fromEnvironment(
+      'OFFICE_EDITOR_URL',
+      defaultValue: 'https://124.222.193.241:6258',
+    ),
   );
 
   final String key;

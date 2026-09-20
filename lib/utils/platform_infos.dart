@@ -40,8 +40,11 @@ abstract class PlatformInfos {
   static bool get supportsCustomImageResizer =>
       PlatformInfos.isWeb || PlatformInfos.isMobile;
 
-  /// Web could also record in theory but currently creates broken opus
-  static bool get platformCanRecord => (isMobile || isMacOS);
+  /// Browsers record Opus in a WebM container. The send path detects the real
+  /// container instead of labelling it as OGG.
+  static bool get platformCanRecord => isWeb || isMobile || isMacOS;
+
+  static bool get supportsEmbeddedOffice => isWeb || isMobile;
 
   static bool get supportsAppLock => (isMobile || isMacOS);
 
