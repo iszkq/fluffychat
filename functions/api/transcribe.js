@@ -38,7 +38,7 @@ export async function onRequestPost(context) {
 
   const upstreamBody = new FormData();
   upstreamBody.set('file', audio, audio.name || 'voice-message.m4a');
-  upstreamBody.set('model', 'whisper-large-v3');
+  upstreamBody.set('model', 'whisper-large-v3-turbo');
   upstreamBody.set('response_format', 'json');
   upstreamBody.set('temperature', '0.2');
 
