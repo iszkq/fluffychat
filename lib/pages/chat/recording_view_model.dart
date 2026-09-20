@@ -64,14 +64,14 @@ class RecordingViewModelState extends State<RecordingViewModel> {
     setState(() {});
 
     try {
-      final codec =
-          !PlatformInfos
-                  .isIOS && // Blocked by https://github.com/llfbandit/record/issues/560
-              await audioRecorder.isEncoderSupported(AudioEncoder.opus)
-          ? AudioEncoder.opus
-          : AudioEncoder.aacLc;
-      final extension = kIsWeb && codec == AudioEncoder.opus
+      const codec = AudioEncoder.opus;
+      if (!await audioRecorder.isEncoderSupported(codec)) {
+        throw const FormatException('Opus recording is not supported');
+      }
+      final extension = kIsWeb
           ? 'webm'
+          : PlatformInfos.isIOS || PlatformInfos.isMacOS
+          ? 'caf'
           : codec.fileExtension;
       fileName =
           'voice_message_${DateTime.now().millisecondsSinceEpoch}.$extension';
