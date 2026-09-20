@@ -69,7 +69,9 @@ class MessageDownloadContent extends StatelessWidget {
                     CircleAvatar(
                       backgroundColor: textColor.withAlpha(32),
                       child: Icon(
-                        Icons.file_download_outlined,
+                        officeDocument
+                            ? Icons.description_outlined
+                            : Icons.file_download_outlined,
                         color: textColor,
                       ),
                     ),
@@ -93,6 +95,19 @@ class MessageDownloadContent extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(color: textColor, fontSize: 10),
                         ),
+                        if (officeDocument && fileSendingStatus == null)
+                          Text(
+                            Localizations.localeOf(context).languageCode == 'zh'
+                                ? '点击在线预览/编辑'
+                                : 'Open online to preview/edit',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: linkColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                       ],
                     ),
                   ),

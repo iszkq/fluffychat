@@ -66,3 +66,13 @@ flutter build web \
   --dart-define=FLUTTER_WEB_CANVASKIT_URL=canvaskit/
 
 cp config.sample.json build/web/config.json
+
+# Cloudflare custom domains can apply a browser TTL to main.dart.js even when
+# Pages itself has a newer deployment. Give every deployment a unique entry
+# point URL so an ordinary refresh immediately loads the new application.
+build_revision="$(git rev-parse --short=12 HEAD 2>/dev/null || date +%s)"
+for bootstrap_file in build/web/index.html build/web/flutter_bootstrap.js; do
+  if [ -f "${bootstrap_file}" ]; then
+    sed -i "s#main\.dart\.js#main.dart.js?v=${build_revision}#g" "${bootstrap_file}"
+  fi
+done

@@ -10,6 +10,7 @@ import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/url_launcher.dart';
 import 'package:fluffychat/widgets/mxc_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -64,7 +65,10 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
 
   Uri? get _cloudIndexUri {
     final uri = Uri.tryParse(AppSettings.cloudStickerIndexUrl.value.trim());
-    return uri?.scheme == 'https' ? uri : null;
+    if (uri == null) return null;
+    if (uri.scheme == 'https') return uri;
+    if (kIsWeb && !uri.hasScheme) return Uri.base.resolveUri(uri);
+    return null;
   }
 
   Future<void> _loadCloudPacks() async {

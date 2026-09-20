@@ -15,7 +15,7 @@
   "audioRecordingBitRate": 64000,
   "audioRecordingSamplingRate": 44100,
   "voiceTranscriptionEndpoint": "/api/transcribe",
-  "cloudStickerIndexUrl": "https://image.527012.xyz/index.json",
+  "cloudStickerIndexUrl": "/api/stickers?index=1",
   "officeEditorUrl": "https://124.222.193.241:6258",
   "renderHtml": true,
   "fontSizeFactor": 1,

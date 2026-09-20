@@ -15,6 +15,15 @@
 /flutter_service_worker.js
   Cache-Control: no-cache, no-store, must-revalidate
 
+/main.dart.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/assets/AssetManifest*
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/assets/assets/office/office_host.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
 /version.json
   Cache-Control: no-cache, no-store, must-revalidate
 

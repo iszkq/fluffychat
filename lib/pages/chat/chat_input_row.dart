@@ -325,7 +325,7 @@ class ChatInputRow extends StatelessWidget {
                         ? HoverBuilder(
                             builder: (context, hovered) => IconButton(
                               tooltip: L10n.of(context).voiceMessage,
-                              onPressed: hovered
+                              onPressed: hovered || PlatformInfos.isWeb
                                   ? () => recordingViewModel.startRecording(
                                       controller.room,
                                     )
