@@ -17,9 +17,7 @@ Vodozemac WASM、`native_imaging` 与 LiveKit E2EE Worker。
    `build/web`。
 4. 把 AIHubMix 密钥保存为 Cloudflare Pages secret，变量名必须为
    `AIHUBMIX_API_KEY`。不要把密钥写入 `config.json`、Dart 源码或 GitHub
-   仓库。转录模型默认使用服务商文档支持的 `whisper-1`；如需更换，可添加普通
-   环境变量 `AIHUBMIX_TRANSCRIPTION_MODEL`，例如 `gpt-4o-mini-transcribe`，
-   但所用密钥必须拥有对应模型权限。
+   仓库。
 
 ## 部署
 

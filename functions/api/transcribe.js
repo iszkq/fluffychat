@@ -6,7 +6,6 @@
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 const AIHUBMIX_TRANSCRIPTION_URL =
   'https://api.inferera.com/v1/audio/transcriptions';
-const DEFAULT_TRANSCRIPTION_MODEL = 'whisper-1';
 
 const jsonResponse = (body, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -39,10 +38,7 @@ export async function onRequestPost(context) {
 
   const upstreamBody = new FormData();
   upstreamBody.set('file', audio, audio.name || 'voice-message.m4a');
-  upstreamBody.set(
-    'model',
-    context.env.AIHUBMIX_TRANSCRIPTION_MODEL || DEFAULT_TRANSCRIPTION_MODEL,
-  );
+  upstreamBody.set('model', 'whisper-large-v3');
   upstreamBody.set('response_format', 'json');
   upstreamBody.set('temperature', '0.2');
 
