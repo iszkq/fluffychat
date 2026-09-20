@@ -20,7 +20,7 @@ Web、Windows、macOS 和 Linux。
 - 语音消息支持 AI 转文字、复制转录内容、展开和收起。
 - 提供 Cloudflare Pages Function 代理，API 密钥不会进入网页包或手机安装包。
 - 优化 Web 音频与图片缓存，降低媒体消息较多时的浏览器内存占用。
-- 增加 Cloudflare Pages 自动构建和部署工作流。
+- 支持 Cloudflare Pages 连接 GitHub 后自动构建和部署。
 
 ## 原项目能力
 

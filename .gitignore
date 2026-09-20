@@ -176,6 +176,7 @@ app.*.symbols
 # +++++++++ Custom +++++++++
 
 # Web
+.cloudflare-tools/
 web/Imaging.js
 web/Imaging.wasm
 web/pkg/package.json
