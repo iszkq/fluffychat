@@ -3,16 +3,12 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'dart:convert';
-
 import 'package:fluffychat/config/app_config.dart';
-import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/chat/sticker_repository.dart';
 import 'package:fluffychat/utils/url_launcher.dart';
 import 'package:fluffychat/widgets/mxc_image.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
@@ -33,13 +29,9 @@ class StickerPickerDialog extends StatefulWidget {
 }
 
 class StickerPickerDialogState extends State<StickerPickerDialog> {
-  static List<_CloudStickerPack> _cachedCloudPacks = const [];
-  static DateTime? _cloudPacksCachedAt;
-  static Uri? _cachedCloudIndexUri;
-
   String? searchFilter;
   String? _selectedPackKey;
-  List<_CloudStickerPack> _cloudPacks = const [];
+  List<CloudStickerPack> _cloudPacks = const [];
   Object? _cloudLoadError;
   bool _cloudPacksLoading = false;
   String? _sendingStickerKey;
@@ -51,18 +43,10 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
   void initState() {
     super.initState();
     _packScrollController.addListener(_updatePackScrollButtons);
-    final cloudIndexUri = _cloudIndexUri;
-    if (widget.usage == ImagePackUsage.sticker && cloudIndexUri != null) {
-      if (_cachedCloudIndexUri != cloudIndexUri) {
-        _cachedCloudPacks = const [];
-        _cloudPacksCachedAt = null;
-        _cachedCloudIndexUri = cloudIndexUri;
-      }
-      _cloudPacks = _cachedCloudPacks;
-      final cacheAge = _cloudPacksCachedAt == null
-          ? null
-          : DateTime.now().difference(_cloudPacksCachedAt!);
-      if (cacheAge == null || cacheAge > const Duration(minutes: 15)) {
+    if (widget.usage == ImagePackUsage.sticker &&
+        CloudStickerRepository.indexUri != null) {
+      _cloudPacks = CloudStickerRepository.cachedPacks;
+      if (CloudStickerRepository.shouldRefresh) {
         _loadCloudPacks();
       }
     }
@@ -115,60 +99,16 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
     if (delta != 0) _scrollPacks(delta);
   }
 
-  Uri? get _cloudIndexUri {
-    final uri = Uri.tryParse(AppSettings.cloudStickerIndexUrl.value.trim());
-    if (uri == null) return null;
-    if (uri.scheme == 'https') return uri;
-    if (kIsWeb && !uri.hasScheme) return Uri.base.resolveUri(uri);
-    return null;
-  }
-
   Future<void> _loadCloudPacks() async {
     if (_cloudPacksLoading) return;
-    final cloudIndexUri = _cloudIndexUri;
-    if (cloudIndexUri == null) return;
+    if (CloudStickerRepository.indexUri == null) return;
     setState(() {
       _cloudPacksLoading = true;
       _cloudLoadError = null;
     });
     try {
-      final response = await http
-          .get(cloudIndexUri)
-          .timeout(const Duration(seconds: 20));
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw Exception('Cloud sticker index returned ${response.statusCode}');
-      }
-      final json = jsonDecode(utf8.decode(response.bodyBytes));
-      if (json is! Map<String, dynamic>) {
-        throw const FormatException('Invalid cloud sticker index');
-      }
-      final packMetadata = <String, Map<String, dynamic>>{
-        for (final value in (json['packs'] as List<dynamic>? ?? const []))
-          if (value is Map<String, dynamic> && value['id'] is String)
-            value['id'] as String: value,
-      };
-      final imagesByPack = <String, List<_CloudSticker>>{};
-      for (final value in (json['items'] as List<dynamic>? ?? const [])) {
-        if (value is! Map<String, dynamic>) continue;
-        final sticker = _CloudSticker.fromJson(value);
-        if (sticker == null) continue;
-        (imagesByPack[sticker.packId] ??= []).add(sticker);
-      }
-      final packs = <_CloudStickerPack>[];
-      for (final entry in packMetadata.entries) {
-        final images = imagesByPack[entry.key] ?? const <_CloudSticker>[];
-        if (images.isEmpty) continue;
-        packs.add(
-          _CloudStickerPack(
-            id: entry.key,
-            name: entry.value['name'] as String? ?? entry.key,
-            images: images,
-          ),
-        );
-      }
+      final packs = await CloudStickerRepository.load();
       if (!mounted) return;
-      _cachedCloudPacks = packs;
-      _cloudPacksCachedAt = DateTime.now();
       setState(() => _cloudPacks = packs);
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _updatePackScrollButtons(),
@@ -206,17 +146,29 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
         ? _selectedPackKey
         : allPackKeys.firstOrNull;
 
-    final choices = <_StickerChoice>[];
-    if (selectedPackKey?.startsWith('matrix:') ?? false) {
+    final normalizedSearch = searchFilter?.trim().toLowerCase() ?? '';
+    final choices = <StickerCatalogEntry>[];
+    if (normalizedSearch.isNotEmpty) {
+      choices.addAll(
+        searchStickerCatalog(
+          buildStickerCatalog(widget.room, _cloudPacks, usage: widget.usage),
+          normalizedSearch,
+        ),
+      );
+    } else if (selectedPackKey?.startsWith('matrix:') ?? false) {
       final slug = selectedPackKey!.substring('matrix:'.length);
       final pack = stickerPacks[slug];
       if (pack != null) {
         for (final entry in pack.images.entries) {
           choices.add(
-            _StickerChoice(
+            StickerCatalogEntry(
               key: 'matrix:$slug:${entry.key}',
               name: entry.value.body ?? entry.key,
-              searchText: '${entry.key} ${entry.value.body ?? ''}',
+              packName: pack.pack.displayName ?? slug,
+              keywords: [
+                entry.key,
+                if (entry.value.body != null) entry.value.body!,
+              ],
               sticker: entry.value,
             ),
           );
@@ -228,22 +180,17 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
       if (pack != null) {
         for (final image in pack.images) {
           choices.add(
-            _StickerChoice(
+            StickerCatalogEntry(
               key: 'cloud:${image.id}',
               name: image.name,
-              searchText: '${image.name} ${image.keywords.join(' ')}',
+              packName: pack.name,
+              keywords: image.keywords,
               sticker: image.asImagePackContent(),
               networkImage: image.thumbUrl,
             ),
           );
         }
       }
-    }
-    final normalizedSearch = searchFilter?.trim().toLowerCase() ?? '';
-    if (normalizedSearch.isNotEmpty) {
-      choices.removeWhere(
-        (choice) => !choice.searchText.toLowerCase().contains(normalizedSearch),
-      );
     }
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _updatePackScrollButtons(),
@@ -513,97 +460,5 @@ class _PackScrollButton extends StatelessWidget {
       onPressed: onPressed,
       icon: Icon(icon),
     ),
-  );
-}
-
-class _StickerChoice {
-  final String key;
-  final String name;
-  final String searchText;
-  final ImagePackImageContent sticker;
-  final Uri? networkImage;
-
-  const _StickerChoice({
-    required this.key,
-    required this.name,
-    required this.searchText,
-    required this.sticker,
-    this.networkImage,
-  });
-}
-
-class _CloudStickerPack {
-  final String id;
-  final String name;
-  final List<_CloudSticker> images;
-
-  const _CloudStickerPack({
-    required this.id,
-    required this.name,
-    required this.images,
-  });
-}
-
-class _CloudSticker {
-  final String id;
-  final String packId;
-  final String name;
-  final String fileName;
-  final Uri url;
-  final Uri thumbUrl;
-  final String mimeType;
-  final List<String> keywords;
-
-  const _CloudSticker({
-    required this.id,
-    required this.packId,
-    required this.name,
-    required this.fileName,
-    required this.url,
-    required this.thumbUrl,
-    required this.mimeType,
-    required this.keywords,
-  });
-
-  static _CloudSticker? fromJson(Map<String, dynamic> json) {
-    final id = json['id'];
-    final packId = json['packId'];
-    final name = json['name'];
-    final fileName = json['fileName'];
-    final url = Uri.tryParse(json['url'] as String? ?? '');
-    final thumbUrl = Uri.tryParse(json['thumbUrl'] as String? ?? '');
-    if (id is! String ||
-        packId is! String ||
-        name is! String ||
-        fileName is! String ||
-        url == null ||
-        thumbUrl == null ||
-        url.scheme != 'https' ||
-        thumbUrl.scheme != 'https') {
-      return null;
-    }
-    return _CloudSticker(
-      id: id,
-      packId: packId,
-      name: name,
-      fileName: fileName,
-      url: url,
-      thumbUrl: thumbUrl,
-      mimeType: json['mimeType'] as String? ?? 'image/gif',
-      keywords: (json['keywords'] as List<dynamic>? ?? const [])
-          .whereType<String>()
-          .toList(),
-    );
-  }
-
-  ImagePackImageContent asImagePackContent() => ImagePackImageContent(
-    url: url,
-    body: name,
-    info: {
-      'mimetype': mimeType,
-      'xyz.flchat.cloud_sticker': true,
-      'xyz.flchat.file_name': fileName,
-    },
-    usage: const [ImagePackUsage.sticker],
   );
 }

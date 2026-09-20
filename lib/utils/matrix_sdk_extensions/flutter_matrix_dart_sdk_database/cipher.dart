@@ -16,60 +16,110 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:matrix/matrix.dart';
 
 const _passwordStorageKey = 'database_password';
+const _sharedIosOptions = IOSOptions(groupId: 'group.im.fluffychat.app');
+const _privateIosOptions = IOSOptions();
 
 Future<String?> getDatabaseCipher() async {
-  String? password;
-
-  const iosOptions = IOSOptions(groupId: 'group.im.fluffychat.app');
-
   try {
-    password = await FlutterSecureStorage(
-      iOptions: iosOptions,
-    ).read(key: _passwordStorageKey, iOptions: iosOptions);
-    if (password != null) return password;
-
+    return await _readOrCreateDatabaseCipher(
+      _sharedIosOptions,
+      migrateFromPrivateStorage: PlatformInfos.isIOS,
+    );
+  } catch (sharedStorageError, sharedStorageStackTrace) {
     if (PlatformInfos.isIOS) {
-      final legacyPassword = await FlutterSecureStorage().read(
-        key: _passwordStorageKey,
+      Logs().w(
+        'Shared iOS Keychain access is unavailable. Falling back to the app Keychain.',
+        sharedStorageError,
+        sharedStorageStackTrace,
       );
-      if (legacyPassword != null) {
-        Logs().i('Migrate database key location on iOS...');
-        await FlutterSecureStorage().delete(key: _passwordStorageKey);
-        await FlutterSecureStorage(iOptions: iosOptions).write(
-          key: _passwordStorageKey,
-          value: legacyPassword,
-          iOptions: iosOptions,
+      try {
+        return await _readOrCreateDatabaseCipher(_privateIosOptions);
+      } catch (privateStorageError, privateStorageStackTrace) {
+        return _handleCipherError(
+          privateStorageError,
+          privateStorageStackTrace,
+          _privateIosOptions,
         );
-        return legacyPassword;
       }
     }
-
-    final rng = Random.secure();
-    final list = Uint8List(32);
-    list.setAll(0, Iterable.generate(list.length, (i) => rng.nextInt(256)));
-    final newPassword = base64UrlEncode(list);
-    await FlutterSecureStorage(
-      iOptions: iosOptions,
-    ).write(key: _passwordStorageKey, value: newPassword, iOptions: iosOptions);
-    // workaround for if we just wrote to the key and it still doesn't exist
-    password = await FlutterSecureStorage(
-      iOptions: iosOptions,
-    ).read(key: _passwordStorageKey, iOptions: iosOptions);
-    if (password == null) throw MissingPluginException();
-    return password;
-  } on MissingPluginException catch (e) {
-    FlutterSecureStorage(
-      iOptions: iosOptions,
-    ).delete(key: _passwordStorageKey, iOptions: iosOptions).catchError((_) {});
-    Logs().w('Database encryption is not supported on this platform', e);
-    _sendNoEncryptionWarning(e);
-  } catch (e, s) {
-    FlutterSecureStorage(
-      iOptions: iosOptions,
-    ).delete(key: _passwordStorageKey, iOptions: iosOptions).catchError((_) {});
-    Logs().w('Unable to init database encryption', e, s);
-    _sendNoEncryptionWarning(e);
+    return _handleCipherError(
+      sharedStorageError,
+      sharedStorageStackTrace,
+      _sharedIosOptions,
+    );
   }
+}
+
+Future<String> _readOrCreateDatabaseCipher(
+  IOSOptions iosOptions, {
+  bool migrateFromPrivateStorage = false,
+}) async {
+  final secureStorage = FlutterSecureStorage(iOptions: iosOptions);
+  var password = await secureStorage.read(
+    key: _passwordStorageKey,
+    iOptions: iosOptions,
+  );
+  if (password != null) return password;
+
+  if (migrateFromPrivateStorage) {
+    final privateStorage = FlutterSecureStorage(iOptions: _privateIosOptions);
+    final privatePassword = await privateStorage.read(
+      key: _passwordStorageKey,
+      iOptions: _privateIosOptions,
+    );
+    if (privatePassword != null) {
+      Logs().i('Migrating database key to the shared iOS Keychain...');
+      await secureStorage.write(
+        key: _passwordStorageKey,
+        value: privatePassword,
+        iOptions: iosOptions,
+      );
+      await privateStorage.delete(
+        key: _passwordStorageKey,
+        iOptions: _privateIosOptions,
+      );
+      return privatePassword;
+    }
+  }
+
+  final rng = Random.secure();
+  final list = Uint8List(32);
+  list.setAll(0, Iterable.generate(list.length, (i) => rng.nextInt(256)));
+  final newPassword = base64UrlEncode(list);
+  await secureStorage.write(
+    key: _passwordStorageKey,
+    value: newPassword,
+    iOptions: iosOptions,
+  );
+
+  // Work around platforms where a successful write is not immediately
+  // readable. Treat that as unavailable secure storage instead of using a
+  // database key that cannot be recovered on the next launch.
+  password = await secureStorage.read(
+    key: _passwordStorageKey,
+    iOptions: iosOptions,
+  );
+  if (password == null) throw MissingPluginException();
+  return password;
+}
+
+String? _handleCipherError(
+  Object exception,
+  StackTrace stackTrace,
+  IOSOptions iosOptions,
+) {
+  FlutterSecureStorage(
+    iOptions: iosOptions,
+  ).delete(key: _passwordStorageKey, iOptions: iosOptions).catchError((_) {});
+  if (exception is MissingPluginException) {
+    Logs().w(
+      'Database encryption is not supported on this platform',
+      exception,
+    );
+  } else {
+    Logs().w('Unable to init database encryption', exception, stackTrace);
+  }
+  _sendNoEncryptionWarning(exception);
   return null;
 }
 

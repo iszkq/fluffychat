@@ -99,9 +99,24 @@ jobs:
           cd build/unsigned-ipa
           zip -qry ../../fluffychat-ios-unsigned.ipa Payload
 
+      - name: Package SideStore-compatible IPA
+        run: |
+          mkdir -p build/sideload-ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/sideload-ipa/Payload/
+          rm -rf build/sideload-ipa/Payload/Runner.app/PlugIns
+          cd build/sideload-ipa
+          zip -qry ../../fluffychat-ios-sideload.ipa Payload
+
       - name: Upload iOS package
         uses: actions/upload-artifact@v7
         with:
           name: fluffychat-ios-unsigned
           path: fluffychat-ios-unsigned.ipa
+          retention-days: 14
+
+      - name: Upload SideStore package
+        uses: actions/upload-artifact@v7
+        with:
+          name: fluffychat-ios-sideload
+          path: fluffychat-ios-sideload.ipa
           retention-days: 14

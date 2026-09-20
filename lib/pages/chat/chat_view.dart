@@ -28,6 +28,7 @@ import 'package:matrix/matrix.dart';
 import '../../utils/stream_extension.dart';
 import 'chat_emoji_picker.dart';
 import 'chat_input_row.dart';
+import 'chat_sticker_suggestions.dart';
 
 enum _EventContextAction { info, report }
 
@@ -463,6 +464,9 @@ class ChatView extends StatelessWidget {
                                                 mainAxisSize: .min,
                                                 children: [
                                                   ReplyDisplay(controller),
+                                                  ChatStickerSuggestions(
+                                                    controller,
+                                                  ),
                                                   ChatInputRow(controller),
                                                   ChatEmojiPicker(controller),
                                                 ],

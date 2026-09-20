@@ -18,7 +18,8 @@ Web、Windows、macOS 和 Linux。
 - 接收端根据文件真实内容识别 OGG、AAC、M4A、MP3、WAV、FLAC、WebM、
   AMR 和 3GP，降低 MIME 或扩展名错误造成的播放失败。
 - 语音消息支持 AI 转文字、复制转录内容、展开和收起。
-- 内置可搜索、可切换分类的云端贴纸库，发送时自动转存到 Matrix 媒体库。
+- 内置可搜索、可切换分类的云端贴纸库；搜索会同时覆盖默认贴纸与云端贴纸，
+  输入消息关键词时还会在编辑器上方给出可直接发送的贴纸建议。
 - 提供 Cloudflare Pages Function 代理，API 密钥不会进入网页包或手机安装包。
 - 优化 Web 音频与图片缓存，降低媒体消息较多时的浏览器内存占用。
 - 支持 Cloudflare Pages 连接 GitHub 后自动构建和部署。
@@ -107,8 +108,17 @@ flutter build apk --release \
 ./scripts/build-ios.sh
 ```
 
-`Build Mobile Packages` 也会生成未签名 IPA，供后续签名使用。未签名 IPA 无法
-直接安装到普通 iPhone，也不能提交 App Store。
+`Build Mobile Packages` 会生成两种 IPA：
+
+- `fluffychat-ios-unsigned`：保留分享和通知扩展的完整未签名包，适合使用自己的
+  Apple Developer 证书签名。
+- `fluffychat-ios-sideload`：面向 SideStore、Sideloadly 等免费个人签名工具，
+  去掉免费证书无法授权的 App Group 扩展，并在共享 Keychain 不可用时自动改用
+  应用自己的安全存储，避免启动时出现 `-34018` 和白屏。
+
+使用免费 Apple ID 时应下载 `fluffychat-ios-sideload.ipa`。该版本可以正常使用
+聊天、贴纸、语音和文件等主程序功能，但系统分享扩展、通知内容解密和正式推送
+仍受苹果免费证书权限限制。未签名 IPA 不能直接安装，也不能提交 App Store。
 
 ## Web
 

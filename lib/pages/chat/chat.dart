@@ -40,6 +40,7 @@ import 'package:fluffychat/widgets/share_scaffold_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -117,6 +118,8 @@ class ChatPageWithRoom extends StatefulWidget {
 
 class ChatController extends State<ChatPageWithRoom>
     with WidgetsBindingObserver {
+  static const int _maxCloudStickerBytes = 15 * 1024 * 1024;
+
   Room get room => sendingClient.getRoomById(roomId) ?? widget.room;
 
   late Client sendingClient;
@@ -751,6 +754,64 @@ class ChatController extends State<ChatPageWithRoom>
       editEvent = null;
       pendingText = '';
     });
+  }
+
+  Future<bool> sendSticker(
+    ImagePackImageContent sticker, {
+    bool closePicker = false,
+  }) async {
+    final proceed = await showTrustUserInRoomDialog(context, room);
+    if (!mounted || !proceed) return false;
+    try {
+      if (sticker.url.scheme == 'http' || sticker.url.scheme == 'https') {
+        final response = await http
+            .get(sticker.url)
+            .timeout(const Duration(seconds: 30));
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw Exception('Sticker download returned ${response.statusCode}');
+        }
+        if (response.bodyBytes.isEmpty ||
+            response.bodyBytes.length > _maxCloudStickerBytes) {
+          throw Exception('Cloud sticker has an invalid file size');
+        }
+        final originalInfo = sticker.info ?? const {};
+        final mimeType =
+            originalInfo['mimetype'] as String? ??
+            response.headers['content-type']?.split(';').first ??
+            'image/gif';
+        final fileName =
+            originalInfo['xyz.flchat.file_name'] as String? ?? 'sticker.gif';
+        sticker.url = await room.client.uploadContent(
+          response.bodyBytes,
+          filename: fileName,
+          contentType: mimeType,
+        );
+        sticker.info = {
+          'mimetype': mimeType,
+          'size': response.bodyBytes.length,
+        };
+      }
+      await room.sendEvent(
+        {
+          'body': sticker.body,
+          'info': sticker.info ?? {},
+          'url': sticker.url.toString(),
+        },
+        type: EventTypes.Sticker,
+        threadRootEventId: activeThreadId,
+        threadLastEventId: threadLastEventId,
+      );
+      if (closePicker && mounted) hideEmojiPicker();
+      return true;
+    } catch (error, stackTrace) {
+      Logs().w('Unable to send sticker', error, stackTrace);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(L10n.of(context).couldNotBeSent)),
+        );
+      }
+      return false;
+    }
   }
 
   Future<void> sendFileAction({FileType type = FileType.any}) async {

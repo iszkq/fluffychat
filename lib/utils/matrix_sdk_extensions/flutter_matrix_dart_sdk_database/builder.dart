@@ -53,10 +53,10 @@ Future<Directory?> getFileStorageLocation() async {
   try {
     late final Directory temporaryDirectory;
     if (PlatformInfos.isIOS) {
-      final containerPath = await PathProviderFoundation().getContainerPath(
-        appGroupIdentifier: 'group.im.fluffychat.app',
-      );
-      temporaryDirectory = Directory(containerPath!);
+      final containerPath = await _getIosAppGroupContainerPath();
+      temporaryDirectory = containerPath == null
+          ? await getTemporaryDirectory()
+          : Directory(containerPath);
     } else if (PlatformInfos.isLinux) {
       temporaryDirectory = await getApplicationCacheDirectory();
     } else {
@@ -169,11 +169,11 @@ Future<void> _ensureIncrementalAutoVacuum(Database database) async {
 
 Future<String> _getDatabaseDirectory() async {
   if (PlatformInfos.isIOS) {
-    final containerPath = await PathProviderFoundation().getContainerPath(
-      appGroupIdentifier: 'group.im.fluffychat.app',
-    );
+    final containerPath = await _getIosAppGroupContainerPath();
     if (containerPath == null) {
-      Logs().w('No container path found for iOS app!');
+      Logs().w(
+        'No shared container found for iOS app. Using the private app container.',
+      );
       return (await getLibraryDirectory()).path;
     }
     return containerPath;
@@ -182,6 +182,20 @@ Future<String> _getDatabaseDirectory() async {
     return (await getLibraryDirectory()).path;
   }
   return (await getApplicationSupportDirectory()).path;
+}
+
+Future<String?> _getIosAppGroupContainerPath() async {
+  try {
+    return await PathProviderFoundation().getContainerPath(
+      appGroupIdentifier: 'group.im.fluffychat.app',
+    );
+  } catch (e, s) {
+    // Free Apple ID sideloading tools cannot preserve App Group entitlements.
+    // The main app must remain usable even when sharing with app extensions is
+    // unavailable in that signing profile.
+    Logs().w('Unable to access the shared iOS app container', e, s);
+    return null;
+  }
 }
 
 Future<String> _getDatabasePath(String clientName) async {
