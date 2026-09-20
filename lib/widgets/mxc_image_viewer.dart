@@ -8,10 +8,17 @@ import 'package:material_ui/material_ui.dart';
 
 import 'mxc_image.dart';
 
-class MxcImageViewer extends StatelessWidget {
+class MxcImageViewer extends StatefulWidget {
   final Uri mxContent;
 
   const MxcImageViewer(this.mxContent, {super.key});
+
+  @override
+  State<MxcImageViewer> createState() => _MxcImageViewerState();
+}
+
+class _MxcImageViewerState extends State<MxcImageViewer> {
+  int _quarterTurns = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +41,28 @@ class MxcImageViewer extends StatelessWidget {
             tooltip: L10n.of(context).close,
           ),
           backgroundColor: Colors.transparent,
+          actions: [
+            IconButton(
+              style: iconButtonStyle,
+              icon: const Icon(Icons.rotate_left),
+              onPressed: () =>
+                  setState(() => _quarterTurns = (_quarterTurns - 1) % 4),
+              color: Colors.white,
+              tooltip: L10n.of(context).rotateLeft,
+            ),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                style: iconButtonStyle,
+                icon: const Icon(Icons.rotate_right),
+                onPressed: () =>
+                    setState(() => _quarterTurns = (_quarterTurns + 1) % 4),
+                color: Colors.white,
+                tooltip: L10n.of(context).rotateRight,
+              ),
+            ),
+          ],
         ),
         body: InteractiveViewer(
           minScale: 1.0,
@@ -48,12 +77,15 @@ class MxcImageViewer extends StatelessWidget {
             child: GestureDetector(
               // Ignore taps to not go back here:
               onTap: () {},
-              child: MxcImage(
-                key: ValueKey(mxContent.toString()),
-                uri: mxContent,
-                fit: BoxFit.contain,
-                isThumbnail: false,
-                animated: true,
+              child: RotatedBox(
+                quarterTurns: _quarterTurns,
+                child: MxcImage(
+                  key: ValueKey(widget.mxContent.toString()),
+                  uri: widget.mxContent,
+                  fit: BoxFit.contain,
+                  isThumbnail: false,
+                  animated: true,
+                ),
               ),
             ),
           ),

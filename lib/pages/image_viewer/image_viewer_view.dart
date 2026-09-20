@@ -41,6 +41,24 @@ class ImageViewerView extends StatelessWidget {
           ),
           backgroundColor: Colors.transparent,
           actions: [
+            if (controller.canRotateCurrent) ...[
+              IconButton(
+                style: iconButtonStyle,
+                icon: const Icon(Icons.rotate_left),
+                onPressed: () => controller.rotateCurrent(-1),
+                color: Colors.white,
+                tooltip: L10n.of(context).rotateLeft,
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                style: iconButtonStyle,
+                icon: const Icon(Icons.rotate_right),
+                onPressed: () => controller.rotateCurrent(1),
+                color: Colors.white,
+                tooltip: L10n.of(context).rotateRight,
+              ),
+              const SizedBox(width: 8),
+            ],
             IconButton(
               style: iconButtonStyle,
               icon: const Icon(Icons.reply_outlined),
@@ -87,6 +105,7 @@ class ImageViewerView extends StatelessWidget {
                     scrollDirection: Axis.horizontal,
                     controller: controller.pageController,
                     itemCount: controller.allEvents.length,
+                    onPageChanged: controller.onPageChanged,
                     itemBuilder: (context, i) {
                       final event = controller.allEvents[i];
                       switch (event.messageType) {
@@ -114,12 +133,15 @@ class ImageViewerView extends StatelessWidget {
                                 child: GestureDetector(
                                   // Ignore taps to not go back here:
                                   onTap: () {},
-                                  child: MxcImage(
-                                    key: ValueKey(event.eventId),
-                                    event: event,
-                                    fit: BoxFit.contain,
-                                    isThumbnail: false,
-                                    animated: true,
+                                  child: RotatedBox(
+                                    quarterTurns: controller.rotationFor(event),
+                                    child: MxcImage(
+                                      key: ValueKey(event.eventId),
+                                      event: event,
+                                      fit: BoxFit.contain,
+                                      isThumbnail: false,
+                                      animated: true,
+                                    ),
                                   ),
                                 ),
                               ),

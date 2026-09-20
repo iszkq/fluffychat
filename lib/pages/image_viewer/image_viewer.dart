@@ -32,6 +32,7 @@ class ImageViewer extends StatefulWidget {
 
 class ImageViewerController extends State<ImageViewer> {
   final FocusNode focusNode = FocusNode();
+  final Map<String, int> _rotationQuarterTurns = {};
 
   @override
   void initState() {
@@ -53,12 +54,14 @@ class ImageViewerController extends State<ImageViewer> {
       (event) => event.eventId == widget.event.eventId,
     );
     if (index < 0) index = 0;
+    _currentIndex = index;
     pageController = PageController(initialPage: index);
   }
 
   late final PageController pageController;
 
   late final List<Event> allEvents;
+  late int _currentIndex;
 
   void onKeyEvent(KeyEvent event) {
     switch (event.logicalKey) {
@@ -89,9 +92,23 @@ class ImageViewerController extends State<ImageViewer> {
     setState(() {});
   }
 
-  int get _index => pageController.page?.toInt() ?? 0;
+  int get _index => _currentIndex;
 
   Event get currentEvent => allEvents[_index];
+
+  bool get canRotateCurrent => currentEvent.messageType != MessageTypes.Video;
+
+  int rotationFor(Event event) => _rotationQuarterTurns[event.eventId] ?? 0;
+
+  void rotateCurrent(int delta) {
+    if (!canRotateCurrent) return;
+    setState(() {
+      _rotationQuarterTurns[currentEvent.eventId] =
+          (rotationFor(currentEvent) + delta) % 4;
+    });
+  }
+
+  void onPageChanged(int index) => setState(() => _currentIndex = index);
 
   bool get canGoNext => _index < allEvents.length - 1;
 

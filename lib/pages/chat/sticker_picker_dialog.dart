@@ -11,6 +11,7 @@ import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/url_launcher.dart';
 import 'package:fluffychat/widgets/mxc_image.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -42,10 +43,14 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
   Object? _cloudLoadError;
   bool _cloudPacksLoading = false;
   String? _sendingStickerKey;
+  final ScrollController _packScrollController = ScrollController();
+  bool _canScrollPacksBack = false;
+  bool _canScrollPacksForward = false;
 
   @override
   void initState() {
     super.initState();
+    _packScrollController.addListener(_updatePackScrollButtons);
     final cloudIndexUri = _cloudIndexUri;
     if (widget.usage == ImagePackUsage.sticker && cloudIndexUri != null) {
       if (_cachedCloudIndexUri != cloudIndexUri) {
@@ -61,6 +66,53 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
         _loadCloudPacks();
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _packScrollController
+      ..removeListener(_updatePackScrollButtons)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _updatePackScrollButtons() {
+    if (!_packScrollController.hasClients || !mounted) return;
+    final position = _packScrollController.position;
+    final canGoBack = position.pixels > position.minScrollExtent + 1;
+    final canGoForward = position.pixels < position.maxScrollExtent - 1;
+    if (canGoBack == _canScrollPacksBack &&
+        canGoForward == _canScrollPacksForward) {
+      return;
+    }
+    setState(() {
+      _canScrollPacksBack = canGoBack;
+      _canScrollPacksForward = canGoForward;
+    });
+  }
+
+  void _scrollPacks(double delta) {
+    if (!_packScrollController.hasClients) return;
+    final position = _packScrollController.position;
+    final target = (_packScrollController.offset + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    _packScrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _handlePackPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_packScrollController.hasClients) {
+      return;
+    }
+    final delta = event.scrollDelta.dx.abs() > event.scrollDelta.dy.abs()
+        ? event.scrollDelta.dx
+        : event.scrollDelta.dy;
+    if (delta != 0) _scrollPacks(delta);
   }
 
   Uri? get _cloudIndexUri {
@@ -118,6 +170,9 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
       _cachedCloudPacks = packs;
       _cloudPacksCachedAt = DateTime.now();
       setState(() => _cloudPacks = packs);
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _updatePackScrollButtons(),
+      );
     } catch (error, stackTrace) {
       Logs().w('Unable to load cloud sticker packs', error, stackTrace);
       if (!mounted) return;
@@ -190,6 +245,9 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
         (choice) => !choice.searchText.toLowerCase().contains(normalizedSearch),
       );
     }
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _updatePackScrollButtons(),
+    );
 
     return Material(
       color: theme.colorScheme.onInverseSurface,
@@ -231,49 +289,110 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
               SliverToBoxAdapter(
                 child: SizedBox(
                   height: 58,
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    scrollDirection: Axis.horizontal,
+                  child: Stack(
                     children: [
-                      for (final slug in packSlugs)
-                        Padding(
-                          padding: const EdgeInsetsDirectional.only(end: 8),
-                          child: ChoiceChip(
-                            selected: selectedPackKey == 'matrix:$slug',
-                            label: Text(
-                              stickerPacks[slug]!.pack.displayName ?? slug,
-                            ),
-                            onSelected: (_) => setState(
-                              () => _selectedPackKey = 'matrix:$slug',
+                      Listener(
+                        onPointerSignal: _handlePackPointerSignal,
+                        child: ScrollConfiguration(
+                          behavior: ScrollConfiguration.of(context).copyWith(
+                            dragDevices: const {
+                              PointerDeviceKind.touch,
+                              PointerDeviceKind.mouse,
+                              PointerDeviceKind.stylus,
+                              PointerDeviceKind.trackpad,
+                            },
+                          ),
+                          child: Scrollbar(
+                            controller: _packScrollController,
+                            thumbVisibility: true,
+                            scrollbarOrientation: ScrollbarOrientation.bottom,
+                            child: ListView(
+                              controller: _packScrollController,
+                              padding: const EdgeInsetsDirectional.only(
+                                start: 52,
+                                end: 52,
+                                bottom: 8,
+                              ),
+                              scrollDirection: Axis.horizontal,
+                              children: [
+                                for (final slug in packSlugs)
+                                  Padding(
+                                    padding: const EdgeInsetsDirectional.only(
+                                      end: 8,
+                                    ),
+                                    child: ChoiceChip(
+                                      selected:
+                                          selectedPackKey == 'matrix:$slug',
+                                      label: Text(
+                                        stickerPacks[slug]!.pack.displayName ??
+                                            slug,
+                                      ),
+                                      onSelected: (_) => setState(
+                                        () => _selectedPackKey = 'matrix:$slug',
+                                      ),
+                                    ),
+                                  ),
+                                for (final pack in _cloudPacks)
+                                  Padding(
+                                    padding: const EdgeInsetsDirectional.only(
+                                      end: 8,
+                                    ),
+                                    child: ChoiceChip(
+                                      avatar: const Icon(
+                                        Icons.cloud_outlined,
+                                        size: 18,
+                                      ),
+                                      selected:
+                                          selectedPackKey == 'cloud:${pack.id}',
+                                      label: Text(pack.name),
+                                      onSelected: (_) => setState(
+                                        () => _selectedPackKey =
+                                            'cloud:${pack.id}',
+                                      ),
+                                    ),
+                                  ),
+                                if (_cloudPacksLoading)
+                                  const Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: SizedBox.square(
+                                      dimension: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  ),
+                                if (_cloudLoadError != null &&
+                                    !_cloudPacksLoading)
+                                  TextButton.icon(
+                                    onPressed: _loadCloudPacks,
+                                    icon: const Icon(Icons.cloud_off_outlined),
+                                    label: const Text('重试云端贴纸'),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
-                      for (final pack in _cloudPacks)
-                        Padding(
-                          padding: const EdgeInsetsDirectional.only(end: 8),
-                          child: ChoiceChip(
-                            avatar: const Icon(Icons.cloud_outlined, size: 18),
-                            selected: selectedPackKey == 'cloud:${pack.id}',
-                            label: Text(pack.name),
-                            onSelected: (_) => setState(
-                              () => _selectedPackKey = 'cloud:${pack.id}',
-                            ),
-                          ),
+                      ),
+                      PositionedDirectional(
+                        start: 4,
+                        top: 4,
+                        child: _PackScrollButton(
+                          icon: Icons.chevron_left,
+                          onPressed: _canScrollPacksBack
+                              ? () => _scrollPacks(-260)
+                              : null,
                         ),
-                      if (_cloudPacksLoading)
-                        const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
+                      ),
+                      PositionedDirectional(
+                        end: 4,
+                        top: 4,
+                        child: _PackScrollButton(
+                          icon: Icons.chevron_right,
+                          onPressed: _canScrollPacksForward
+                              ? () => _scrollPacks(260)
+                              : null,
                         ),
-                      if (_cloudLoadError != null && !_cloudPacksLoading)
-                        TextButton.icon(
-                          onPressed: _loadCloudPacks,
-                          icon: const Icon(Icons.cloud_off_outlined),
-                          label: const Text('重试云端贴纸'),
-                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -373,6 +492,28 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
       ),
     );
   }
+}
+
+class _PackScrollButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  const _PackScrollButton({required this.icon, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) => Material(
+    elevation: onPressed == null ? 0 : 2,
+    color: Theme.of(context).colorScheme.surface.withAlpha(238),
+    shape: const CircleBorder(),
+    child: IconButton(
+      visualDensity: VisualDensity.compact,
+      tooltip: icon == Icons.chevron_left
+          ? L10n.of(context).previous
+          : L10n.of(context).next,
+      onPressed: onPressed,
+      icon: Icon(icon),
+    ),
+  );
 }
 
 class _StickerChoice {
