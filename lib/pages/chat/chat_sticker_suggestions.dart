@@ -6,6 +6,7 @@
 import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/pages/chat/sticker_repository.dart';
 import 'package:fluffychat/widgets/mxc_image.dart';
+import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
@@ -23,11 +24,15 @@ class ChatStickerSuggestions extends StatefulWidget {
 class _ChatStickerSuggestionsState extends State<ChatStickerSuggestions> {
   List<CloudStickerPack> _cloudPacks = CloudStickerRepository.cachedPacks;
   String? _sendingKey;
+  final ScrollController _scrollController = ScrollController();
+  bool _canScrollBack = false;
+  bool _canScrollForward = false;
 
   @override
   void initState() {
     super.initState();
     widget.controller.sendController.addListener(_handleTextChanged);
+    _scrollController.addListener(_updateScrollButtons);
     _loadCloudStickers();
   }
 
@@ -44,11 +49,54 @@ class _ChatStickerSuggestionsState extends State<ChatStickerSuggestions> {
   @override
   void dispose() {
     widget.controller.sendController.removeListener(_handleTextChanged);
+    _scrollController
+      ..removeListener(_updateScrollButtons)
+      ..dispose();
     super.dispose();
   }
 
   void _handleTextChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollButtons());
+  }
+
+  void _updateScrollButtons() {
+    if (!_scrollController.hasClients || !mounted) return;
+    final position = _scrollController.position;
+    final canScrollBack = position.pixels > position.minScrollExtent + 1;
+    final canScrollForward = position.pixels < position.maxScrollExtent - 1;
+    if (_canScrollBack == canScrollBack &&
+        _canScrollForward == canScrollForward) {
+      return;
+    }
+    setState(() {
+      _canScrollBack = canScrollBack;
+      _canScrollForward = canScrollForward;
+    });
+  }
+
+  void _scrollBy(double delta) {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final target = (_scrollController.offset + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    _scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    final delta = event.scrollDelta.dx.abs() > event.scrollDelta.dy.abs()
+        ? event.scrollDelta.dx
+        : event.scrollDelta.dy;
+    if (delta != 0) _scrollBy(delta);
   }
 
   Future<void> _loadCloudStickers() async {
@@ -93,10 +141,10 @@ class _ChatStickerSuggestionsState extends State<ChatStickerSuggestions> {
     final suggestions = searchStickerCatalog(
       buildStickerCatalog(widget.controller.room, _cloudPacks),
       query,
-      limit: 12,
       matchKeywordsInsideSentence: true,
     );
     if (suggestions.isEmpty) return const SizedBox.shrink();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollButtons());
 
     final theme = Theme.of(context);
     return Container(
@@ -107,82 +155,151 @@ class _ChatStickerSuggestionsState extends State<ChatStickerSuggestions> {
           bottom: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
       ),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        itemCount: suggestions.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final entry = suggestions[index];
-          final sending = _sendingKey == entry.key;
-          return Tooltip(
-            message: '${entry.name} · ${entry.packName}',
-            child: Material(
-              color: theme.colorScheme.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(AppConfig.borderRadius),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: _sendingKey == null ? () => _sendSticker(entry) : null,
-                child: SizedBox(
-                  width: 68,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(6, 4, 6, 18),
-                        child: entry.networkImage == null
-                            ? AbsorbPointer(
-                                child: MxcImage(
-                                  uri: entry.sticker.url,
-                                  fit: BoxFit.contain,
-                                  width: 58,
-                                  height: 58,
-                                  animated: true,
-                                  isThumbnail: false,
-                                ),
-                              )
-                            : Image.network(
-                                entry.networkImage.toString(),
-                                fit: BoxFit.contain,
-                                width: 58,
-                                height: 58,
-                                gaplessPlayback: true,
-                                errorBuilder: (_, _, _) =>
-                                    const Icon(Icons.broken_image_outlined),
-                              ),
-                      ),
-                      PositionedDirectional(
-                        start: 4,
-                        end: 4,
-                        bottom: 2,
-                        child: Text(
-                          entry.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.labelSmall,
+      child: Stack(
+        children: [
+          Listener(
+            onPointerSignal: _handlePointerSignal,
+            child: ScrollConfiguration(
+              behavior: ScrollConfiguration.of(context).copyWith(
+                dragDevices: const {
+                  PointerDeviceKind.touch,
+                  PointerDeviceKind.mouse,
+                  PointerDeviceKind.stylus,
+                  PointerDeviceKind.trackpad,
+                },
+              ),
+              child: Scrollbar(
+                controller: _scrollController,
+                thumbVisibility: suggestions.length > 1,
+                scrollbarOrientation: ScrollbarOrientation.bottom,
+                child: ListView.separated(
+                  controller: _scrollController,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsetsDirectional.fromSTEB(44, 6, 44, 8),
+                  itemCount: suggestions.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final entry = suggestions[index];
+                    final sending = _sendingKey == entry.key;
+                    return Tooltip(
+                      message: '${entry.name} · ${entry.packName}',
+                      child: Material(
+                        color: theme.colorScheme.surfaceContainerLowest,
+                        borderRadius: BorderRadius.circular(
+                          AppConfig.borderRadius,
                         ),
-                      ),
-                      if (sending)
-                        const Positioned.fill(
-                          child: ColoredBox(
-                            color: Color(0x66000000),
-                            child: Center(
-                              child: SizedBox.square(
-                                dimension: 24,
-                                child: CircularProgressIndicator.adaptive(),
-                              ),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: _sendingKey == null
+                              ? () => _sendSticker(entry)
+                              : null,
+                          child: SizedBox(
+                            width: 68,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    6,
+                                    4,
+                                    6,
+                                    18,
+                                  ),
+                                  child: entry.networkImage == null
+                                      ? AbsorbPointer(
+                                          child: MxcImage(
+                                            uri: entry.sticker.url,
+                                            fit: BoxFit.contain,
+                                            width: 58,
+                                            height: 58,
+                                            animated: true,
+                                            isThumbnail: false,
+                                          ),
+                                        )
+                                      : Image.network(
+                                          entry.networkImage.toString(),
+                                          fit: BoxFit.contain,
+                                          width: 58,
+                                          height: 58,
+                                          gaplessPlayback: true,
+                                          errorBuilder: (_, _, _) => const Icon(
+                                            Icons.broken_image_outlined,
+                                          ),
+                                        ),
+                                ),
+                                PositionedDirectional(
+                                  start: 4,
+                                  end: 4,
+                                  bottom: 2,
+                                  child: Text(
+                                    entry.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.labelSmall,
+                                  ),
+                                ),
+                                if (sending)
+                                  const Positioned.fill(
+                                    child: ColoredBox(
+                                      color: Color(0x66000000),
+                                      child: Center(
+                                        child: SizedBox.square(
+                                          dimension: 24,
+                                          child:
+                                              CircularProgressIndicator.adaptive(),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
-          );
-        },
+          ),
+          PositionedDirectional(
+            start: 4,
+            top: 22,
+            child: _SuggestionScrollButton(
+              icon: Icons.chevron_left,
+              onPressed: _canScrollBack ? () => _scrollBy(-304) : null,
+            ),
+          ),
+          PositionedDirectional(
+            end: 4,
+            top: 22,
+            child: _SuggestionScrollButton(
+              icon: Icons.chevron_right,
+              onPressed: _canScrollForward ? () => _scrollBy(304) : null,
+            ),
+          ),
+        ],
       ),
     );
   }
+}
+
+class _SuggestionScrollButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  const _SuggestionScrollButton({required this.icon, this.onPressed});
+
+  @override
+  Widget build(BuildContext context) => Material(
+    elevation: onPressed == null ? 0 : 2,
+    color: Theme.of(context).colorScheme.surface.withAlpha(238),
+    shape: const CircleBorder(),
+    child: IconButton(
+      visualDensity: VisualDensity.compact,
+      onPressed: onPressed,
+      icon: Icon(icon),
+    ),
+  );
 }
