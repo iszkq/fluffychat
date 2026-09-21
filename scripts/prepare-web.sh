@@ -10,9 +10,11 @@ SED=$(command -v gsed || command -v sed)
 # Compile Vodozemac for web
 version=$(yq ".dependencies.flutter_vodozemac" < pubspec.yaml)
 version=$(printf "%s" "$version" | tr -d '"^')
-git clone https://github.com/famedly/dart-vodozemac.git -b ${version} .vodozemac
+git clone --depth 1 https://github.com/famedly/dart-vodozemac.git -b ${version} .vodozemac
 cd .vodozemac
-cargo install flutter_rust_bridge_codegen
+if ! command -v flutter_rust_bridge_codegen >/dev/null 2>&1; then
+  cargo install flutter_rust_bridge_codegen
+fi
 flutter_rust_bridge_codegen build-web --dart-root dart --rust-root $(readlink -f rust) --release
 cd ..
 rm -f ./assets/vodozemac/vodozemac_bindings_dart*
@@ -35,7 +37,7 @@ rmdir js
 rm native_imaging.zip
 
 # Enable e2ee for LiveKit:
-git clone https://github.com/livekit/client-sdk-flutter.git
+git clone --depth 1 https://github.com/livekit/client-sdk-flutter.git
 cd client-sdk-flutter
 flutter pub get
 

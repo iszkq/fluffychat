@@ -5,16 +5,20 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 # Cloudflare Pages 部署
 
-此项目可以通过 Cloudflare Pages 连接 GitHub 仓库自动部署。仓库提供了专用构建
-脚本，用于安装 Cloudflare 构建环境缺少的 Flutter、Rust 和 `yq`，并生成
-Vodozemac WASM、`native_imaging` 与 LiveKit E2EE Worker。
+此项目通过 GitHub Actions 构建并部署到 Cloudflare Pages。Cloudflare Pages 的
+Git 集成构建时间有限，而 Flutter Web 构建还需要生成 Vodozemac WASM、
+`native_imaging` 与 LiveKit E2EE Worker，因此不建议让 Pages 直接执行完整构建。
 
 ## 首次配置
 
-1. 在 Cloudflare Pages 选择“连接到 Git”，授权并选择 GitHub 仓库。
-2. 生产分支选择 `main`，框架预设选择“无”，根目录保持仓库根目录。
-3. 构建命令填写 `bash ./scripts/cloudflare-pages-build.sh`，构建输出目录填写
-   `build/web`。
+1. 在 Cloudflare Pages 创建名为 `fluffychat` 的项目。不要启用 Git 集成构建，
+   或将其暂停，避免 Cloudflare 再次执行完整 Flutter 构建。
+2. 在 Cloudflare API Tokens 中创建一个具有 Pages 部署权限的 Token，并将以下
+   两项保存为 GitHub 仓库 Secrets：`CLOUDFLARE_API_TOKEN`、
+   `CLOUDFLARE_ACCOUNT_ID`。
+3. 推送到 `main` 会自动触发
+   `.github/workflows/deploy_cloudflare_pages.yml`。该工作流在 GitHub Actions
+   中构建 Web，并使用 Wrangler 将 `build/web` 部署到 `fluffychat` 项目。
 4. 把 AIHubMix 密钥保存为 Cloudflare Pages secret，变量名必须为
    `AIHUBMIX_API_KEY`。不要把密钥写入 `config.json`、Dart 源码或 GitHub
    仓库。
@@ -37,10 +41,8 @@ Vodozemac WASM、`native_imaging` 与 LiveKit E2EE Worker。
 
 ## 部署
 
-保存设置后点击“保存并部署”。Cloudflare 会拉取 `main`，准备 Web 原生模块、
-构建 Flutter Web，并同时部署静态资源与 `/api/transcribe` Pages Function。
-以后推送到 `main` 会自动重新部署，不需要配置 GitHub Actions Secret 或
-Cloudflare API Token。
+保存 Secrets 后，推送到 `main` 即会自动构建和部署。Cloudflare Pages 只负责托管
+构建后的静态文件与 `/api/transcribe` Pages Function，不再承担 Flutter/Rust 构建。
 
 Android 的 Matrix 推送网关同时部署在：
 

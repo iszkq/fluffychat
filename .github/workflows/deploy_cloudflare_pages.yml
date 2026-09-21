@@ -1,0 +1,85 @@
+# SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: Deploy Web to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-pages-production
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    name: Build and deploy Flutter Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin/flutter_rust_bridge_codegen
+            ~/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu
+          key: web-rust-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            web-rust-${{ runner.os }}-
+
+      - name: Add Rust nightly and rust-src
+        run: |
+          rustup toolchain install nightly-x86_64-unknown-linux-gnu \
+            --profile minimal \
+            --component rust-src
+
+      - name: Install yq
+        run: |
+          curl --fail --silent --show-error --location \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
+            --output "${RUNNER_TEMP}/yq"
+          chmod +x "${RUNNER_TEMP}/yq"
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+
+      - name: Prepare Web dependencies
+        run: |
+          flutter config --enable-web --no-analytics
+          flutter precache --web
+          flutter pub get
+          ./scripts/prepare-web.sh
+
+      - name: Build Flutter Web
+        run: |
+          flutter build web \
+            --release \
+            --dart-define=FLUTTER_WEB_CANVASKIT_URL=canvaskit/
+          cp config.sample.json build/web/config.json
+          build_revision="$(git rev-parse --short=12 HEAD)"
+          for bootstrap_file in build/web/index.html build/web/flutter_bootstrap.js; do
+            if [ -f "${bootstrap_file}" ]; then
+              sed -i "s#main\\.dart\\.js#main.dart.js?v=${build_revision}#g" "${bootstrap_file}"
+            fi
+          done
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy build/web --project-name=fluffychat
