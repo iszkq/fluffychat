@@ -10,6 +10,7 @@ import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_file_extension.dart';
+import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -18,6 +19,7 @@ import 'package:uuid/uuid.dart';
 import 'office_editor_platform_view.dart';
 
 const _officeExtensions = {'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'pdf'};
+const officeEditMetadataKey = 'xyz.flchat.office_edit';
 
 bool isOfficeDocument(String fileName) {
   final dot = fileName.lastIndexOf('.');
@@ -35,7 +37,11 @@ Future<void> openOfficeDocument(BuildContext context, Event event) async {
   await Navigator.of(context, rootNavigator: true).push<void>(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) => OfficeEditorPage(file: file, room: event.room),
+      builder: (_) => OfficeEditorPage(
+        file: file,
+        room: event.room,
+        sourceEvent: event,
+      ),
     ),
   );
 }
@@ -45,8 +51,14 @@ enum _ExportAction { download, send }
 class OfficeEditorPage extends StatefulWidget {
   final MatrixFile file;
   final Room room;
+  final Event sourceEvent;
 
-  const OfficeEditorPage({required this.file, required this.room, super.key});
+  const OfficeEditorPage({
+    required this.file,
+    required this.room,
+    required this.sourceEvent,
+    super.key,
+  });
 
   @override
   State<OfficeEditorPage> createState() => _OfficeEditorPageState();
@@ -58,6 +70,7 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
   final String _requestId = const Uuid().v4();
   OfficeBridgeSend? _send;
   Timer? _startupTimeout;
+  Timer? _saveTimeout;
   Completer<void>? _chunkAcknowledged;
   int? _waitingForChunk;
   bool _sourceStarted = false;
@@ -73,13 +86,19 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
   int _savedChunks = 0;
   String? _savedFileName;
   String? _savedMimeType;
+  String? _activeSaveId;
 
   _OfficeStrings get _strings => _OfficeStrings.of(context);
+
+  bool get _sourceBelongsToCurrentUser =>
+      widget.sourceEvent.senderId == widget.room.client.userID;
+
+  bool get _useMobilePresentation =>
+      PlatformInfos.isMobile || MediaQuery.sizeOf(context).shortestSide < 600;
 
   void _onSendReady(OfficeBridgeSend send) {
     _send = send;
     final locale = Localizations.localeOf(context);
-    final isCompact = MediaQuery.sizeOf(context).shortestSide < 600;
     send({
       'type': 'fluffy-office-init',
       'requestId': _requestId,
@@ -93,7 +112,7 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
       'theme': Theme.of(context).brightness == Brightness.dark
           ? 'dark'
           : 'light',
-      'mobile': isCompact,
+      'mobile': _useMobilePresentation,
     });
     _startupTimeout?.cancel();
     _startupTimeout = Timer(const Duration(seconds: 45), () {
@@ -135,8 +154,10 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
       case 'fluffy-office-saved-chunk':
         _appendSavedChunk(message);
       case 'fluffy-office-saved-end':
-        unawaited(_finishSavedFile());
+        unawaited(_finishSavedFile(message));
       case 'xinghuo-office-error':
+        final saveId = message['saveId'];
+        if (saveId != null && saveId != _activeSaveId) return;
         _showError(
           message['message'] is String
               ? message['message']! as String
@@ -199,6 +220,7 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
   }
 
   void _beginSavedFile(Map<String, Object?> message) {
+    if (!_matchesActiveSave(message)) return;
     _savedBytes = BytesBuilder(copy: false);
     _savedByteLength = message['byteLength'] as int?;
     _savedChunkCount = message['chunkCount'] as int?;
@@ -208,13 +230,30 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
   }
 
   void _appendSavedChunk(Map<String, Object?> message) {
+    if (!_matchesActiveSave(message)) return;
     final chunk = message['chunkData'];
     if (_savedBytes == null || chunk is! String) return;
-    _savedBytes!.add(base64Decode(chunk));
-    _savedChunks++;
+    if (message['chunkIndex'] != _savedChunks) {
+      _showError(_strings.incompleteExport);
+      return;
+    }
+    try {
+      _savedBytes!.add(base64Decode(chunk));
+      _savedChunks++;
+    } on FormatException {
+      _showError(_strings.incompleteExport);
+    }
   }
 
-  Future<void> _finishSavedFile() async {
+  bool _matchesActiveSave(Map<String, Object?> message) {
+    final saveId = message['saveId'];
+    return _activeSaveId != null &&
+        (saveId == null || saveId == _activeSaveId);
+  }
+
+  Future<void> _finishSavedFile(Map<String, Object?> message) async {
+    if (!_matchesActiveSave(message)) return;
+    _saveTimeout?.cancel();
     final builder = _savedBytes;
     final action = _pendingAction;
     _savedBytes = null;
@@ -228,7 +267,7 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
       _showError(_strings.incompleteExport);
       return;
     }
-    final file = MatrixFile(
+    var file = MatrixFile(
       bytes: bytes,
       name: _savedFileName ?? widget.file.name,
       mimeType: _savedMimeType ?? widget.file.mimeType,
@@ -237,11 +276,48 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
       if (action == _ExportAction.download) {
         await file.save(context);
       } else {
-        await widget.room.sendFileEvent(file);
+        final updatedAt = DateTime.now();
+        final editorId = widget.room.client.userID;
+        final editorName = _editorName(editorId);
+        if (!_sourceBelongsToCurrentUser) {
+          file = MatrixFile(
+            bytes: bytes,
+            name: _editedCopyName(widget.file.name, editorName, updatedAt),
+            mimeType: _savedMimeType ?? widget.file.mimeType,
+          );
+        } else if (file.name != widget.file.name) {
+          file = MatrixFile(
+            bytes: bytes,
+            name: widget.file.name,
+            mimeType: file.mimeType,
+          );
+        }
+        await widget.room.sendFileEvent(
+          file,
+          editEventId: _sourceBelongsToCurrentUser
+              ? widget.sourceEvent.eventId
+              : null,
+          extraContent: {
+            officeEditMetadataKey: {
+              'editor': editorName,
+              if (editorId != null) 'editor_id': editorId,
+              'updated_at': updatedAt.toUtc().toIso8601String(),
+              'source_event_id': widget.sourceEvent.eventId,
+            },
+          },
+        );
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(SnackBar(content: Text(_strings.sent)));
+          ).showSnackBar(
+            SnackBar(
+              content: Text(
+                _sourceBelongsToCurrentUser
+                    ? _strings.updatedOriginal
+                    : _strings.sentCopy,
+              ),
+            ),
+          );
         }
       }
       if (mounted) {
@@ -249,6 +325,7 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
           _saving = false;
           _dirty = false;
           _status = '';
+          _activeSaveId = null;
         });
       }
     } catch (error, stackTrace) {
@@ -266,6 +343,7 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
     final saveId = const Uuid().v4();
     setState(() {
       _pendingAction = action;
+      _activeSaveId = saveId;
       _saving = true;
       _status = _strings.exporting;
       _error = null;
@@ -274,7 +352,24 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
       'type': 'xinghuo-office-save',
       'requestId': _requestId,
       'saveId': saveId,
+      'fileName': widget.file.name,
+      'mimeType': widget.file.mimeType,
+      'mobile': _useMobilePresentation,
     });
+    _saveTimeout?.cancel();
+    _saveTimeout = Timer(const Duration(minutes: 2), () {
+      if (_activeSaveId == saveId) _showError(_strings.saveTimedOut);
+    });
+  }
+
+  String _editorName(String? userId) {
+    if (userId == null) return _strings.unknownEditor;
+    final displayName = widget.room
+        .unsafeGetUserFromMemoryOrFallback(userId)
+        .calcDisplayname()
+        .trim();
+    if (displayName.isNotEmpty) return displayName;
+    return userId.split(':').first.replaceFirst('@', '');
   }
 
   void _setStatus(String value) {
@@ -287,9 +382,12 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
 
   void _showError(String value) {
     if (!mounted) return;
+    _saveTimeout?.cancel();
     setState(() {
       _saving = false;
       _pendingAction = null;
+      _activeSaveId = null;
+      _savedBytes = null;
       _status = '';
       _error = value;
     });
@@ -298,6 +396,7 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
   @override
   void dispose() {
     _startupTimeout?.cancel();
+    _saveTimeout?.cancel();
     if (!(_chunkAcknowledged?.isCompleted ?? true)) {
       _chunkAcknowledged!.completeError(StateError('Office editor closed'));
     }
@@ -357,8 +456,12 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
                           ),
                         ),
                         _OfficeActionButton(
-                          tooltip: _strings.sendToChat,
-                          icon: Icons.send_outlined,
+                          tooltip: _sourceBelongsToCurrentUser
+                              ? _strings.saveChanges
+                              : _strings.sendEditedCopy,
+                          icon: _sourceBelongsToCurrentUser
+                              ? Icons.save_outlined
+                              : Icons.send_outlined,
                           onPressed: canExport
                               ? () => _export(_ExportAction.send)
                               : null,
@@ -370,8 +473,16 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
                       onPressed: canExport
                           ? () => _export(_ExportAction.send)
                           : null,
-                      icon: const Icon(Icons.send_outlined),
-                      label: Text(_strings.sendToChat),
+                      icon: Icon(
+                        _sourceBelongsToCurrentUser
+                            ? Icons.save_outlined
+                            : Icons.send_outlined,
+                      ),
+                      label: Text(
+                        _sourceBelongsToCurrentUser
+                            ? _strings.saveChanges
+                            : _strings.sendEditedCopy,
+                      ),
                     ),
                 ],
               ),
@@ -417,8 +528,28 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
                       ),
                       const SizedBox(height: 12),
                       Text(_strings.failed, textAlign: TextAlign.center),
-                      const SizedBox(height: 8),
-                      Text(_error!, textAlign: TextAlign.center),
+                      if (_error != _strings.failed) ...[
+                        const SizedBox(height: 8),
+                        Text(_error!, textAlign: TextAlign.center),
+                      ],
+                      const SizedBox(height: 16),
+                      TextButton.icon(
+                        onPressed: () {
+                          if (_opened) {
+                            setState(() => _error = null);
+                          } else {
+                            Navigator.of(context).pop();
+                          }
+                        },
+                        icon: Icon(
+                          _opened ? Icons.arrow_back : Icons.close,
+                        ),
+                        label: Text(
+                          _opened
+                              ? _strings.backToDocument
+                              : _strings.close,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -499,8 +630,47 @@ class _OfficeStrings {
       : 'Unable to reach the Office editor. Check its URL and HTTPS certificate.';
   String get incompleteExport =>
       zh ? '导出的文档数据不完整' : 'The exported document is incomplete';
+  String get saveTimedOut => zh
+      ? 'Office 编辑服务未在两分钟内返回文档，请返回后重试'
+      : 'The Office editor did not return the document within two minutes. Please try again.';
   String get unsaved => zh ? '有未发送的修改' : 'Unsaved changes';
   String get downloadCopy => zh ? '下载编辑后的副本' : 'Download edited copy';
-  String get sendToChat => zh ? '发送到聊天' : 'Send to chat';
-  String get sent => zh ? '编辑后的文档已发送' : 'Edited document sent';
+  String get saveChanges => zh ? '保存并替换原文件' : 'Save and replace original';
+  String get sendEditedCopy => zh ? '发送编辑后的副本' : 'Send edited copy';
+  String get updatedOriginal =>
+      zh ? '原文件已更新' : 'The original file was updated';
+  String get sentCopy => zh ? '编辑后的副本已发送' : 'Edited copy sent';
+  String get unknownEditor => zh ? '编辑者' : 'Editor';
+  String get backToDocument => zh ? '返回文档' : 'Back to document';
+  String get close => zh ? '关闭' : 'Close';
+}
+
+String _editedCopyName(
+  String originalName,
+  String editorName,
+  DateTime updatedAt,
+) {
+  final dot = originalName.lastIndexOf('.');
+  final rawBase = dot > 0 ? originalName.substring(0, dot) : originalName;
+  final extension = dot > 0 ? originalName.substring(dot) : '';
+  final safeBase = _safeFileNamePart(rawBase, fallback: 'document');
+  final safeEditor = _safeFileNamePart(editorName, fallback: 'editor');
+  String twoDigits(int value) => value.toString().padLeft(2, '0');
+  final stamp = '${updatedAt.year.toString().padLeft(4, '0')}-'
+      '${twoDigits(updatedAt.month)}-${twoDigits(updatedAt.day)}_'
+      '${twoDigits(updatedAt.hour)}-${twoDigits(updatedAt.minute)}';
+  final suffix = '_${safeEditor}_$stamp';
+  final remainingRunes = 180 - suffix.runes.length - extension.runes.length;
+  final maxBaseRunes = remainingRunes > 1 ? remainingRunes : 1;
+  final clippedBase = String.fromCharCodes(safeBase.runes.take(maxBaseRunes));
+  return '$clippedBase$suffix$extension';
+}
+
+String _safeFileNamePart(String value, {required String fallback}) {
+  final safe = value
+      .trim()
+      .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
+      .replaceAll(RegExp(r'\s+'), '_')
+      .replaceAll(RegExp(r'[. ]+$'), '');
+  return safe.isEmpty ? fallback : safe;
 }

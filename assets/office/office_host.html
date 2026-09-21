@@ -9,8 +9,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <title>Office Editor</title>
   <style>
-    html, body { width: 100%; min-width: 100%; height: 100%; margin: 0; border: 0; overflow: hidden; background: #f5f5f5; }
-    #editor { display: block; width: 100vw; min-width: 100%; height: 100%; margin: 0; border: 0; overflow: hidden; background: #f5f5f5; }
+    html, body { width: 100%; min-width: 100%; height: 100%; min-height: 100dvh; margin: 0; border: 0; overflow: hidden; background: #f5f5f5; }
+    #editor { display: block; width: 100vw; min-width: 100%; height: 100%; min-height: 100dvh; margin: 0; border: 0; overflow: hidden; background: #f5f5f5; }
   </style>
 </head>
 <body>
@@ -38,8 +38,53 @@
         }
       };
 
+      const localizedError = (zh, en) =>
+        config && String(config.lang || '').toLowerCase().startsWith('zh') ? zh : en;
+
+      const base64ToArrayBuffer = (value) => {
+        const encoded = value.includes(',') ? value.slice(value.indexOf(',') + 1) : value;
+        const binary = atob(encoded);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+        return bytes.buffer;
+      };
+
+      const normalizeSavedBuffer = async (value) => {
+        if (value instanceof ArrayBuffer) return value;
+        if (ArrayBuffer.isView(value)) {
+          return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
+        }
+        if (typeof SharedArrayBuffer !== 'undefined' && value instanceof SharedArrayBuffer) {
+          return Uint8Array.from(new Uint8Array(value)).buffer;
+        }
+        if (typeof Blob !== 'undefined' && value instanceof Blob) return value.arrayBuffer();
+        if (typeof value === 'string') return base64ToArrayBuffer(value);
+        if (Array.isArray(value)) return Uint8Array.from(value).buffer;
+        if (value && value.type === 'Buffer' && Array.isArray(value.data)) {
+          return Uint8Array.from(value.data).buffer;
+        }
+        if (value && typeof value === 'object') {
+          const numericKeys = Object.keys(value).filter((key) => /^\d+$/.test(key));
+          if (numericKeys.length > 0) {
+            numericKeys.sort((left, right) => Number(left) - Number(right));
+            return Uint8Array.from(numericKeys.map((key) => value[key])).buffer;
+          }
+        }
+        throw new Error(localizedError(
+          'Office 编辑服务未返回可保存的文档数据',
+          'The Office editor did not return savable document data.'
+        ));
+      };
+
       const emitSaved = async (message) => {
-        const bytes = new Uint8Array(message.buffer);
+        const buffer = await normalizeSavedBuffer(message.buffer ?? message.blob ?? message.data);
+        const bytes = new Uint8Array(buffer);
+        if (bytes.byteLength === 0) {
+          throw new Error(localizedError(
+            'Office 编辑服务返回了空文档',
+            'The Office editor returned an empty document.'
+          ));
+        }
         const chunkSize = 48 * 1024;
         const chunkCount = Math.ceil(bytes.byteLength / chunkSize);
         emit({
@@ -86,7 +131,10 @@
           editor.searchParams.set('editing', message.editing === false ? '0' : '1');
           editor.searchParams.set('lang', message.lang || 'zh-CN');
           editor.searchParams.set('theme', message.theme || 'light');
-          editor.searchParams.set('mobile', message.mobile ? '1' : '0');
+          const mobile = message.mobile === true ||
+            (navigator.userAgentData && navigator.userAgentData.mobile === true) ||
+            /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+          editor.searchParams.set('mobile', mobile ? '1' : '0');
           // The compact toolbar reserves a fixed-width mobile canvas in an
           // embedded WebView. Let the editor use its responsive toolbar so
           // the document can occupy the full viewport instead.
@@ -120,11 +168,12 @@
           return;
         }
         if (event.source !== frame.contentWindow || event.origin !== editorOrigin || message.requestId !== config.requestId) return;
-        if (message.type === 'xinghuo-office-saved' && message.buffer instanceof ArrayBuffer) {
+        if (message.type === 'xinghuo-office-saved') {
           emitSaved(message).catch((error) => emit({
             type: 'xinghuo-office-error',
             requestId: config.requestId,
-            message: String(error)
+            saveId: message.saveId,
+            message: error instanceof Error ? error.message : String(error)
           }));
           return;
         }

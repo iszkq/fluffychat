@@ -9,6 +9,7 @@ import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/events/file_send_status_indicator.dart';
 import 'package:fluffychat/pages/office_editor/office_editor.dart';
+import 'package:fluffychat/utils/date_time_extension.dart';
 import 'package:fluffychat/utils/file_description.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
@@ -47,6 +48,24 @@ class MessageDownloadContent extends StatelessWidget {
     final fileSendingStatus = event.fileSendingStatus;
     final officeDocument =
         PlatformInfos.supportsEmbeddedOffice && isOfficeDocument(filename);
+    final newContent = event.content.tryGetMap<String, Object?>(
+      'm.new_content',
+    );
+    final officeEditMetadata =
+        event.content.tryGetMap<String, Object?>(officeEditMetadataKey) ??
+        newContent?.tryGetMap<String, Object?>(officeEditMetadataKey);
+    final editorName = officeEditMetadata?.tryGet<String>('editor')?.trim();
+    final updatedAtValue = officeEditMetadata?.tryGet<String>('updated_at');
+    final updatedAt = updatedAtValue == null
+        ? null
+        : DateTime.tryParse(updatedAtValue)?.toLocal();
+    final officeEditLabel = editorName != null &&
+            editorName.isNotEmpty &&
+            updatedAt != null
+        ? Localizations.localeOf(context).languageCode == 'zh'
+              ? '$editorName · 更新于 ${updatedAt.localizedTime(context)}'
+              : '$editorName · Updated ${updatedAt.localizedTime(context)}'
+        : null;
     return LayoutBuilder(
       builder: (context, constraints) {
         final cardWidth = constraints.maxWidth.isFinite
@@ -113,6 +132,20 @@ class MessageDownloadContent extends StatelessWidget {
                                   fontSize: 11,
                                 ),
                               ),
+                              if (officeEditLabel != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    officeEditLabel,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: textColor.withAlpha(190),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
                               if (officeDocument && fileSendingStatus == null)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 2),
