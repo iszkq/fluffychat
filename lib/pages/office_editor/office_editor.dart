@@ -307,6 +307,8 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
   @override
   Widget build(BuildContext context) {
     final compact = MediaQuery.sizeOf(context).shortestSide < 600;
+    final canExport = _opened && !_saving;
+    final actionSurface = Theme.of(context).colorScheme.surfaceContainerHighest;
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -321,29 +323,60 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: _strings.downloadCopy,
-            onPressed: _opened && !_saving
-                ? () => _export(_ExportAction.download)
-                : null,
-            icon: const Icon(Icons.download_outlined),
-          ),
-          if (compact)
-            IconButton(
-              tooltip: _strings.sendToChat,
-              onPressed: _opened && !_saving
-                  ? () => _export(_ExportAction.send)
-                  : null,
-              icon: const Icon(Icons.send_outlined),
-            )
-          else
-            TextButton.icon(
-              onPressed: _opened && !_saving
-                  ? () => _export(_ExportAction.send)
-                  : null,
-              icon: const Icon(Icons.send_outlined),
-              label: Text(_strings.sendToChat),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: actionSurface.withAlpha(210),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _OfficeActionButton(
+                    tooltip: _strings.downloadCopy,
+                    icon: Icons.download_outlined,
+                    onPressed: canExport
+                        ? () => _export(_ExportAction.download)
+                        : null,
+                  ),
+                  if (compact)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          height: 28,
+                          child: VerticalDivider(
+                            width: 1,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .outlineVariant,
+                          ),
+                        ),
+                        _OfficeActionButton(
+                          tooltip: _strings.sendToChat,
+                          icon: Icons.send_outlined,
+                          onPressed: canExport
+                              ? () => _export(_ExportAction.send)
+                              : null,
+                        ),
+                      ],
+                    )
+                  else
+                    TextButton.icon(
+                      onPressed: canExport
+                          ? () => _export(_ExportAction.send)
+                          : null,
+                      icon: const Icon(Icons.send_outlined),
+                      label: Text(_strings.sendToChat),
+                    ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(width: 8),
         ],
       ),
@@ -392,6 +425,54 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _OfficeActionButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  const _OfficeActionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(11);
+    final colorScheme = Theme.of(context).colorScheme;
+    final enabled = onPressed != null;
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        label: tooltip,
+        enabled: enabled,
+        child: Material(
+          color: enabled
+              ? colorScheme.surface.withAlpha(220)
+              : Colors.transparent,
+          borderRadius: radius,
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: radius,
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Icon(
+                icon,
+                size: 22,
+                color: enabled
+                    ? colorScheme.onSurface
+                    : colorScheme.onSurface.withAlpha(90),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -36,13 +36,10 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
   bool _cloudPacksLoading = false;
   String? _sendingStickerKey;
   final ScrollController _packScrollController = ScrollController();
-  bool _canScrollPacksBack = false;
-  bool _canScrollPacksForward = false;
 
   @override
   void initState() {
     super.initState();
-    _packScrollController.addListener(_updatePackScrollButtons);
     if (widget.usage == ImagePackUsage.sticker &&
         CloudStickerRepository.indexUri != null) {
       _cloudPacks = CloudStickerRepository.cachedPacks;
@@ -54,25 +51,8 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
 
   @override
   void dispose() {
-    _packScrollController
-      ..removeListener(_updatePackScrollButtons)
-      ..dispose();
+    _packScrollController.dispose();
     super.dispose();
-  }
-
-  void _updatePackScrollButtons() {
-    if (!_packScrollController.hasClients || !mounted) return;
-    final position = _packScrollController.position;
-    final canGoBack = position.pixels > position.minScrollExtent + 1;
-    final canGoForward = position.pixels < position.maxScrollExtent - 1;
-    if (canGoBack == _canScrollPacksBack &&
-        canGoForward == _canScrollPacksForward) {
-      return;
-    }
-    setState(() {
-      _canScrollPacksBack = canGoBack;
-      _canScrollPacksForward = canGoForward;
-    });
   }
 
   void _scrollPacks(double delta) {
@@ -110,9 +90,6 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
       final packs = await CloudStickerRepository.load();
       if (!mounted) return;
       setState(() => _cloudPacks = packs);
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _updatePackScrollButtons(),
-      );
     } catch (error, stackTrace) {
       Logs().w('Unable to load cloud sticker packs', error, stackTrace);
       if (!mounted) return;
@@ -192,10 +169,6 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
         }
       }
     }
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _updatePackScrollButtons(),
-    );
-
     return Material(
       color: theme.colorScheme.onInverseSurface,
       child: SafeArea(
@@ -236,32 +209,30 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
               SliverToBoxAdapter(
                 child: SizedBox(
                   height: 58,
-                  child: Stack(
-                    children: [
-                      Listener(
-                        onPointerSignal: _handlePackPointerSignal,
-                        child: ScrollConfiguration(
-                          behavior: ScrollConfiguration.of(context).copyWith(
-                            dragDevices: const {
-                              PointerDeviceKind.touch,
-                              PointerDeviceKind.mouse,
-                              PointerDeviceKind.stylus,
-                              PointerDeviceKind.trackpad,
-                            },
+                  child: Listener(
+                    onPointerSignal: _handlePackPointerSignal,
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(context).copyWith(
+                        dragDevices: const {
+                          PointerDeviceKind.touch,
+                          PointerDeviceKind.mouse,
+                          PointerDeviceKind.stylus,
+                          PointerDeviceKind.trackpad,
+                        },
+                      ),
+                      child: Scrollbar(
+                        controller: _packScrollController,
+                        thumbVisibility: true,
+                        scrollbarOrientation: ScrollbarOrientation.bottom,
+                        child: ListView(
+                          controller: _packScrollController,
+                          padding: const EdgeInsetsDirectional.only(
+                            start: 8,
+                            end: 8,
+                            bottom: 8,
                           ),
-                          child: Scrollbar(
-                            controller: _packScrollController,
-                            thumbVisibility: true,
-                            scrollbarOrientation: ScrollbarOrientation.bottom,
-                            child: ListView(
-                              controller: _packScrollController,
-                              padding: const EdgeInsetsDirectional.only(
-                                start: 52,
-                                end: 52,
-                                bottom: 8,
-                              ),
-                              scrollDirection: Axis.horizontal,
-                              children: [
+                          scrollDirection: Axis.horizontal,
+                          children: [
                                 for (final slug in packSlugs)
                                   Padding(
                                     padding: const EdgeInsetsDirectional.only(
@@ -315,32 +286,10 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
                                     icon: const Icon(Icons.cloud_off_outlined),
                                     label: const Text('重试云端贴纸'),
                                   ),
-                              ],
-                            ),
-                          ),
+                          ],
                         ),
                       ),
-                      PositionedDirectional(
-                        start: 4,
-                        top: 4,
-                        child: _PackScrollButton(
-                          icon: Icons.chevron_left,
-                          onPressed: _canScrollPacksBack
-                              ? () => _scrollPacks(-260)
-                              : null,
-                        ),
-                      ),
-                      PositionedDirectional(
-                        end: 4,
-                        top: 4,
-                        child: _PackScrollButton(
-                          icon: Icons.chevron_right,
-                          onPressed: _canScrollPacksForward
-                              ? () => _scrollPacks(260)
-                              : null,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -439,26 +388,4 @@ class StickerPickerDialogState extends State<StickerPickerDialog> {
       ),
     );
   }
-}
-
-class _PackScrollButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onPressed;
-
-  const _PackScrollButton({required this.icon, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) => Material(
-    elevation: onPressed == null ? 0 : 2,
-    color: Theme.of(context).colorScheme.surface.withAlpha(238),
-    shape: const CircleBorder(),
-    child: IconButton(
-      visualDensity: VisualDensity.compact,
-      tooltip: icon == Icons.chevron_left
-          ? L10n.of(context).previous
-          : L10n.of(context).next,
-      onPressed: onPressed,
-      icon: Icon(icon),
-    ),
-  );
 }

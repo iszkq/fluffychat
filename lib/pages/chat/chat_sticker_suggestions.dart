@@ -25,14 +25,11 @@ class _ChatStickerSuggestionsState extends State<ChatStickerSuggestions> {
   List<CloudStickerPack> _cloudPacks = CloudStickerRepository.cachedPacks;
   String? _sendingKey;
   final ScrollController _scrollController = ScrollController();
-  bool _canScrollBack = false;
-  bool _canScrollForward = false;
 
   @override
   void initState() {
     super.initState();
     widget.controller.sendController.addListener(_handleTextChanged);
-    _scrollController.addListener(_updateScrollButtons);
     _loadCloudStickers();
   }
 
@@ -49,9 +46,7 @@ class _ChatStickerSuggestionsState extends State<ChatStickerSuggestions> {
   @override
   void dispose() {
     widget.controller.sendController.removeListener(_handleTextChanged);
-    _scrollController
-      ..removeListener(_updateScrollButtons)
-      ..dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -59,22 +54,6 @@ class _ChatStickerSuggestionsState extends State<ChatStickerSuggestions> {
     if (!mounted) return;
     setState(() {});
     if (_scrollController.hasClients) _scrollController.jumpTo(0);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollButtons());
-  }
-
-  void _updateScrollButtons() {
-    if (!_scrollController.hasClients || !mounted) return;
-    final position = _scrollController.position;
-    final canScrollBack = position.pixels > position.minScrollExtent + 1;
-    final canScrollForward = position.pixels < position.maxScrollExtent - 1;
-    if (_canScrollBack == canScrollBack &&
-        _canScrollForward == canScrollForward) {
-      return;
-    }
-    setState(() {
-      _canScrollBack = canScrollBack;
-      _canScrollForward = canScrollForward;
-    });
   }
 
   void _scrollBy(double delta) {
@@ -144,8 +123,6 @@ class _ChatStickerSuggestionsState extends State<ChatStickerSuggestions> {
       matchKeywordsInsideSentence: true,
     );
     if (suggestions.isEmpty) return const SizedBox.shrink();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollButtons());
-
     final theme = Theme.of(context);
     return Container(
       height: 88,
@@ -155,11 +132,9 @@ class _ChatStickerSuggestionsState extends State<ChatStickerSuggestions> {
           bottom: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
       ),
-      child: Stack(
-        children: [
-          Listener(
-            onPointerSignal: _handlePointerSignal,
-            child: ScrollConfiguration(
+      child: Listener(
+        onPointerSignal: _handlePointerSignal,
+        child: ScrollConfiguration(
               behavior: ScrollConfiguration.of(context).copyWith(
                 dragDevices: const {
                   PointerDeviceKind.touch,
@@ -175,7 +150,7 @@ class _ChatStickerSuggestionsState extends State<ChatStickerSuggestions> {
                 child: ListView.separated(
                   controller: _scrollController,
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsetsDirectional.fromSTEB(44, 6, 44, 8),
+                  padding: const EdgeInsetsDirectional.fromSTEB(8, 6, 8, 8),
                   itemCount: suggestions.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
@@ -262,44 +237,8 @@ class _ChatStickerSuggestionsState extends State<ChatStickerSuggestions> {
                 ),
               ),
             ),
-          ),
-          PositionedDirectional(
-            start: 4,
-            top: 22,
-            child: _SuggestionScrollButton(
-              icon: Icons.chevron_left,
-              onPressed: _canScrollBack ? () => _scrollBy(-304) : null,
-            ),
-          ),
-          PositionedDirectional(
-            end: 4,
-            top: 22,
-            child: _SuggestionScrollButton(
-              icon: Icons.chevron_right,
-              onPressed: _canScrollForward ? () => _scrollBy(304) : null,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
-}
-
-class _SuggestionScrollButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onPressed;
-
-  const _SuggestionScrollButton({required this.icon, this.onPressed});
-
-  @override
-  Widget build(BuildContext context) => Material(
-    elevation: onPressed == null ? 0 : 2,
-    color: Theme.of(context).colorScheme.surface.withAlpha(238),
-    shape: const CircleBorder(),
-    child: IconButton(
-      visualDensity: VisualDensity.compact,
-      onPressed: onPressed,
-      icon: Icon(icon),
-    ),
-  );
 }
