@@ -208,18 +208,9 @@ const sendToNtfy = async (notification, device, configuredBaseUrl) => {
 
   if (fallbackResponse.ok) return { rejected: false };
   if (response.status >= 400 && response.status < 500) {
-    return {
-      rejected: true,
-      ntfyStatus: response.status,
-      fallbackStatus: fallbackResponse.status,
-    };
+    return { rejected: true };
   }
-  return {
-    rejected: false,
-    temporaryFailure: true,
-    ntfyStatus: response.status,
-    fallbackStatus: fallbackResponse.status,
-  };
+  return { rejected: false, temporaryFailure: true };
 };
 
 const permanentFcmFailure = (status, responseBody) => {
@@ -329,22 +320,14 @@ export async function onRequestPost(context) {
       }),
     ),
   );
-  const debug = context.request.headers.get('x-fluffychat-debug') === '1';
   if (results.some((result) => result.temporaryFailure)) {
-    return jsonResponse(
-      {
-        error: 'Push service temporarily rejected the push.',
-        ...(debug ? { debug: results } : {}),
-      },
-      502,
-    );
+    return jsonResponse({ error: 'Push service temporarily rejected the push.' }, 502);
   }
 
   return jsonResponse({
     rejected: devices
       .filter((_, index) => results[index].rejected)
       .map((device) => device.pushkey),
-    ...(debug ? { debug: results } : {}),
   });
 }
 
