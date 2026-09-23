@@ -167,7 +167,7 @@ const createNtfyMessage = (notification, device) => {
       },
     ],
     tags: ['speech_balloon'],
-    priority: notification.prio === 'low' ? 'default' : 'high',
+    priority: notification.prio === 'low' ? 3 : 4,
   };
 };
 
