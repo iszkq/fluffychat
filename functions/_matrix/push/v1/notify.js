@@ -179,15 +179,34 @@ const sendToNtfy = async (notification, device, configuredBaseUrl) => {
     /\/$/,
     '',
   );
+  const message = createNtfyMessage(notification, device);
   const response = await fetch(baseUrl, {
     method: 'POST',
     headers: {
       'content-type': 'application/json; charset=utf-8',
     },
-    body: JSON.stringify(createNtfyMessage(notification, device)),
+    body: JSON.stringify(message),
   });
 
   if (response.ok) return { rejected: false };
+
+  const fallbackResponse = await fetch(
+    `${baseUrl}/${encodeURIComponent(topic)}`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'text/plain; charset=utf-8',
+        Title: message.title,
+        Priority: String(message.priority),
+        Tags: message.tags.join(','),
+        Click: message.click,
+        Actions: `view, Open FluffyChat, ${message.click}, clear=true`,
+      },
+      body: message.message,
+    },
+  );
+
+  if (fallbackResponse.ok) return { rejected: false };
   if (response.status >= 400 && response.status < 500) {
     return { rejected: true };
   }
