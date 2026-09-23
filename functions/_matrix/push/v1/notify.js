@@ -4,6 +4,7 @@
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const MAX_REQUEST_BYTES = 64 * 1024;
+const NTFY_PUSHKEY_PREFIX = 'ntfy:';
 
 let cachedAccessToken;
 
@@ -131,6 +132,61 @@ const createMessageData = (notification, device) => {
   return data;
 };
 
+const getNtfyTopic = (device) => {
+  if (typeof device?.pushkey !== 'string') return null;
+  if (!device.pushkey.startsWith(NTFY_PUSHKEY_PREFIX)) return null;
+  const topic = device.pushkey.slice(NTFY_PUSHKEY_PREFIX.length).trim();
+  return topic || null;
+};
+
+const createNtfyMessage = (notification, device) => {
+  const roomName = notification.room_name || 'Matrix 房间';
+  const sender = notification.sender_display_name || '新消息';
+  const unread = notification.counts?.unread;
+  const roomId = notification.room_id;
+  const eventId = notification.event_id;
+  const clientName = device.data?.client_name;
+  const query = new URLSearchParams();
+  if (eventId) query.set('event', eventId);
+  if (clientName) query.set('client', clientName);
+  const deepLink = roomId
+    ? `im.fluffychat://room/${encodeURIComponent(roomId)}${query.size ? `?${query}` : ''}`
+    : 'im.fluffychat://';
+
+  return {
+    topic: getNtfyTopic(device),
+    title: roomName,
+    message: unread ? `${sender} · ${unread} 条未读消息` : `${sender} 有新消息`,
+    click: deepLink,
+    actions: `view,打开 FluffyChat,${deepLink}`,
+    tags: 'speech_balloon',
+    priority: notification.prio === 'low' ? 'default' : 'high',
+  };
+};
+
+const sendToNtfy = async (notification, device, configuredBaseUrl) => {
+  const topic = getNtfyTopic(device);
+  if (!topic) return null;
+
+  const baseUrl = String(configuredBaseUrl || 'https://ntfy.sh').replace(
+    /\/$/,
+    '',
+  );
+  const response = await fetch(`${baseUrl}/${encodeURIComponent(topic)}`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+    },
+    body: JSON.stringify(createNtfyMessage(notification, device)),
+  });
+
+  if (response.ok) return { rejected: false };
+  if (response.status >= 400 && response.status < 500) {
+    return { rejected: true };
+  }
+  return { rejected: false, temporaryFailure: true };
+};
+
 const permanentFcmFailure = (status, responseBody) => {
   if (status === 404) return true;
   const details = responseBody?.error?.details;
@@ -217,24 +273,29 @@ export async function onRequestPost(context) {
 
   let account;
   let accessToken;
-  try {
-    account = parseServiceAccount(context.env.FIREBASE_SERVICE_ACCOUNT);
-    accessToken = await createAccessToken(account);
-  } catch (error) {
-    console.error('Firebase configuration error:', error?.message || error);
-    return jsonResponse({ error: 'Push service is not configured.' }, 503);
+  if (devices.some((device) => !getNtfyTopic(device))) {
+    try {
+      account = parseServiceAccount(context.env.FIREBASE_SERVICE_ACCOUNT);
+      accessToken = await createAccessToken(account);
+    } catch (error) {
+      console.error('Firebase configuration error:', error?.message || error);
+      return jsonResponse({ error: 'Push service is not configured.' }, 503);
+    }
   }
 
   const results = await Promise.all(
     devices.map((device) =>
-      sendToDevice(account, accessToken, notification, device).catch((error) => {
-        console.error('Unable to contact Firebase:', error?.message || error);
+      (getNtfyTopic(device)
+        ? sendToNtfy(notification, device, context.env.NTFY_BASE_URL)
+        : sendToDevice(account, accessToken, notification, device)
+      ).catch((error) => {
+        console.error('Unable to contact push service:', error?.message || error);
         return { rejected: false, temporaryFailure: true };
       }),
     ),
   );
   if (results.some((result) => result.temporaryFailure)) {
-    return jsonResponse({ error: 'Firebase temporarily rejected the push.' }, 502);
+    return jsonResponse({ error: 'Push service temporarily rejected the push.' }, 502);
   }
 
   return jsonResponse({

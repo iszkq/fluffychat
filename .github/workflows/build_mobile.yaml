@@ -16,6 +16,10 @@ on:
         required: true
         default: https://124.222.193.241:6258
         type: string
+      push_notifications_gateway_url:
+        description: Matrix Push Gateway URL ending in /_matrix/push/v1/notify
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -107,12 +111,18 @@ jobs:
         env:
           VOICE_TRANSCRIPTION_ENDPOINT: ${{ inputs.voice_transcription_endpoint }}
           OFFICE_EDITOR_URL: ${{ inputs.office_editor_url }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          PUSH_NOTIFICATIONS_GATEWAY_URL: ${{ inputs.push_notifications_gateway_url }}
         run: >-
+          test -n "${NTFY_TOPIC}" || (echo "::error::Missing NTFY_TOPIC repository secret" && exit 1)
+          &&
           flutter build ios
           --release
           --no-codesign
           --dart-define="VOICE_TRANSCRIPTION_ENDPOINT=${VOICE_TRANSCRIPTION_ENDPOINT}"
           --dart-define="OFFICE_EDITOR_URL=${OFFICE_EDITOR_URL}"
+          --dart-define="NTFY_TOPIC=${NTFY_TOPIC}"
+          --dart-define="PUSH_NOTIFICATIONS_GATEWAY_URL=${PUSH_NOTIFICATIONS_GATEWAY_URL}"
 
       - name: Package unsigned IPA
         run: |

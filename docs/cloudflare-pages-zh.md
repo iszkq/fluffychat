@@ -54,6 +54,17 @@ https://你的域名/_matrix/push/v1/notify
 `FIREBASE_SERVICE_ACCOUNT` 时会返回 503，避免生成一个看似成功但实际无法发送
 通知的网关。
 
+没有 Apple Developer 账号时，可以使用同一个网关为 iOS 侧载版转发到 ntfy。
+完整配置见 [iOS 侧载版 Matrix 推送](ios-ntfy-push-zh.md)。在 Cloudflare
+Pages 中设置 `NTFY_BASE_URL`（默认 `https://ntfy.sh`），然后使用随机主题构建
+iOS：
+
+```sh
+flutter build ios --release \
+  --dart-define=NTFY_TOPIC=你的随机ntfy主题 \
+  --dart-define=PUSH_NOTIFICATIONS_GATEWAY_URL=https://你的域名/_matrix/push/v1/notify
+```
+
 手机端若要复用同一转录代理，构建时传入完整地址：
 
 ```sh

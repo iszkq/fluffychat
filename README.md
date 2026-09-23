@@ -120,6 +120,10 @@ flutter build apk --release \
 聊天、贴纸、语音和文件等主程序功能，但系统分享扩展、通知内容解密和正式推送
 仍受苹果免费证书权限限制。未签名 IPA 不能直接安装，也不能提交 App Store。
 
+如果没有 Apple Developer 账号，iOS 侧载版仍可通过 ntfy 接收 Matrix 后台通知，
+并在点击通知时打开对应房间。需要先部署 Matrix 推送网关、在 ntfy App 中订阅
+随机主题，再按 [iOS 侧载版 Matrix 推送](docs/ios-ntfy-push-zh.md) 的参数构建。
+
 ## Web
 
 正式构建前必须生成 Vodozemac WASM、`native_imaging` 和 LiveKit E2EE

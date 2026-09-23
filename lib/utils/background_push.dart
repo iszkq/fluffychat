@@ -269,7 +269,16 @@ class BackgroundPush {
     // that would either duplicate notifications or require Google services.
     if (PlatformInfos.isAndroid) return;
 
-    if (PlatformInfos.isAndroid &&
+    if (PlatformInfos.isIOS) {
+      for (final client in clients) {
+        if (client.onLoginStateChanged.value != LoginState.loggedIn ||
+            !PlatformInfos.isMobile ||
+            matrix == null) {
+          continue;
+        }
+        await setupNtfy(client);
+      }
+    } else if (PlatformInfos.isAndroid &&
         (await UnifiedPush.getDistributors()).isNotEmpty &&
         context.mounted) {
       await UnifiedPushUi(
@@ -371,6 +380,28 @@ class BackgroundPush {
       client: client,
       gatewayUrl: AppSettings.pushNotificationsGatewayUrl.value,
       token: _fcmToken,
+    );
+  }
+
+  Future<void> setupNtfy(Client client) async {
+    final topic = AppConfig.ntfyTopic.trim();
+    if (topic.isEmpty) {
+      Logs().w(
+        '[Push] NTFY_TOPIC is empty; build iOS with --dart-define=NTFY_TOPIC=...',
+      );
+      return;
+    }
+
+    final gatewayUrl = AppSettings.pushNotificationsGatewayUrl.value.trim();
+    if (gatewayUrl.isEmpty) {
+      Logs().w('[Push] Matrix push gateway URL is empty');
+      return;
+    }
+
+    await setupPusher(
+      client: client,
+      gatewayUrl: gatewayUrl,
+      token: 'ntfy:$topic',
     );
   }
 

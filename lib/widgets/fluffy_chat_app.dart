@@ -58,6 +58,27 @@ class FluffyChatApp extends StatelessWidget {
       if (state.uri.toString().startsWith(AppConfig.deepLinkPrefix)) {
         return '/rooms/newprivatechat#${state.uri}';
       }
+
+      if (state.uri.scheme == AppConfig.appOpenUrlScheme &&
+          state.uri.host == 'room') {
+        final roomId = Uri.decodeComponent(state.uri.pathSegments.join('/'));
+        if (roomId.isEmpty) return '/';
+
+        final queryParameters = <String, String>{};
+        final eventId = state.uri.queryParameters['event'];
+        final clientName = state.uri.queryParameters['client'];
+        if (eventId != null && eventId.isNotEmpty) {
+          queryParameters['event'] = eventId;
+        }
+        if (clientName != null && clientName.isNotEmpty) {
+          queryParameters['client'] = clientName;
+        }
+
+        return Uri(
+          path: '/rooms/$roomId',
+          queryParameters: queryParameters.isEmpty ? null : queryParameters,
+        ).toString();
+      }
       return null;
     },
   );
