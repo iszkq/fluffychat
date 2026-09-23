@@ -68,7 +68,7 @@ dependencies:
       url: https://github.com/famedly/matrix-dart-sdk.git
       # The branch is force-pushed upstream. Pin a reachable revision so clean
       # GitHub Actions builds do not fail when an old commit disappears.
-      ref: 167e2522c3378c7d0cf1373f587c0decc376bca1
+      ref: cbf84c6f384b5fb5a6654c7e2396b04f67e67658
   media_kit_libs_linux: ^1.2.1
   media_kit_libs_windows_audio: ^1.0.9
   mime: ^2.1.0
