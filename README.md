@@ -121,8 +121,9 @@ flutter build apk --release \
 仍受苹果免费证书权限限制。未签名 IPA 不能直接安装，也不能提交 App Store。
 
 如果没有 Apple Developer 账号，iOS 侧载版仍可通过 ntfy 接收 Matrix 后台通知，
-并在点击通知时打开对应房间。需要先部署 Matrix 推送网关、在 ntfy App 中订阅
-随机主题，再按 [iOS 侧载版 Matrix 推送](docs/ios-ntfy-push-zh.md) 的参数构建。
+并在点击通知时打开对应房间。需要先部署 Matrix 推送网关并安装 ntfy App；
+每台设备首次运行后，在 FluffyChat 的个人设置中复制该设备的专属主题，再到
+ntfy App 中订阅。详细步骤见 [iOS 侧载版 Matrix 推送](docs/ios-ntfy-push-zh.md)。
 
 ## Web
 

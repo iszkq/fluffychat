@@ -23,6 +23,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 import 'package:unifiedpush/unifiedpush.dart';
 import 'package:unifiedpush_ui/unifiedpush_ui.dart';
+import 'package:uuid/uuid.dart';
 
 import '../config/app_config.dart';
 import '../config/setting_keys.dart';
@@ -61,6 +62,7 @@ class BackgroundPush {
   DateTime? lastReceivedPush;
 
   bool upAction = false;
+  final Map<String, Future<String>> _ntfyTopics = {};
 
   Future<void> _init() async {
     //<GOOGLE_SERVICES>firebaseEnabled = true;
@@ -384,13 +386,8 @@ class BackgroundPush {
   }
 
   Future<void> setupNtfy(Client client) async {
-    final topic = AppConfig.ntfyTopic.trim();
-    if (topic.isEmpty) {
-      Logs().w(
-        '[Push] NTFY_TOPIC is empty; build iOS with --dart-define=NTFY_TOPIC=...',
-      );
-      return;
-    }
+    final topic = await getNtfyTopic(client);
+    if (topic == null) return;
 
     final gatewayUrl = AppSettings.pushNotificationsGatewayUrl.value.trim();
     if (gatewayUrl.isEmpty) {
@@ -403,6 +400,31 @@ class BackgroundPush {
       gatewayUrl: gatewayUrl,
       token: 'ntfy:$topic',
     );
+  }
+
+  Future<String?> getNtfyTopic(Client client) async {
+    if (!PlatformInfos.isIOS) return null;
+    final userId = client.userID;
+    if (userId == null) return null;
+
+    final key =
+        '${AppConfig.ntfyTopicStoragePrefix}${client.clientName}.$userId';
+
+    final topicFuture = _ntfyTopics.putIfAbsent(
+      key,
+      () async {
+        final store = await AppSettings.init();
+        final existingTopic = store.getString(key)?.trim();
+        if (existingTopic != null && existingTopic.isNotEmpty) {
+          return existingTopic;
+        }
+
+        final topic = 'fluffychat-${Uuid().v4().replaceAll('-', '')}';
+        await store.setString(key, topic);
+        return topic;
+      },
+    );
+    return topicFuture;
   }
 
   Future<void> _newUpEndpoint(PushEndpoint newPushEndpoint, String i) async {

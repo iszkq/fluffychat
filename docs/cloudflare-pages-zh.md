@@ -56,12 +56,12 @@ https://你的域名/_matrix/push/v1/notify
 
 没有 Apple Developer 账号时，可以使用同一个网关为 iOS 侧载版转发到 ntfy。
 完整配置见 [iOS 侧载版 Matrix 推送](ios-ntfy-push-zh.md)。在 Cloudflare
-Pages 中设置 `NTFY_BASE_URL`（默认 `https://ntfy.sh`），然后使用随机主题构建
-iOS：
+Pages 中设置 `NTFY_BASE_URL`（默认 `https://ntfy.sh`）。iOS 客户端首次运行时
+会为每台设备生成并保存独立主题，用户从 FluffyChat 的个人设置复制主题后，
+再到 ntfy App 中订阅：
 
 ```sh
 flutter build ios --release \
-  --dart-define=NTFY_TOPIC=你的随机ntfy主题 \
   --dart-define=PUSH_NOTIFICATIONS_GATEWAY_URL=https://你的域名/_matrix/push/v1/notify
 ```
 
