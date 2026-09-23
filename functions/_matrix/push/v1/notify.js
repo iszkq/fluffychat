@@ -158,7 +158,14 @@ const createNtfyMessage = (notification, device) => {
     title: roomName,
     message: unread ? `${sender} · ${unread} 条未读消息` : `${sender} 有新消息`,
     click: deepLink,
-    actions: `view,打开 FluffyChat,${deepLink}`,
+    actions: [
+      {
+        action: 'view',
+        label: '打开 FluffyChat',
+        url: deepLink,
+        clear: true,
+      },
+    ],
     tags: 'speech_balloon',
     priority: notification.prio === 'low' ? 'default' : 'high',
   };
@@ -172,7 +179,7 @@ const sendToNtfy = async (notification, device, configuredBaseUrl) => {
     /\/$/,
     '',
   );
-  const response = await fetch(`${baseUrl}/${encodeURIComponent(topic)}`, {
+  const response = await fetch(baseUrl, {
     method: 'POST',
     headers: {
       'content-type': 'application/json; charset=utf-8',
