@@ -37,6 +37,7 @@ class SettingsNotificationsView extends StatelessWidget {
       if (pushRules?.underride?.isNotEmpty ?? false)
         (rules: pushRules?.underride ?? [], kind: PushRuleKind.underride),
     ];
+    final pushService = Matrix.of(context).backgroundPush;
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: !FluffyThemes.isColumnMode(context),

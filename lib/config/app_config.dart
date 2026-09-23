@@ -20,6 +20,8 @@ abstract class AppConfig {
   static const String pushNotificationsChannelId = 'fluffychat_push';
   static const String pushNotificationsAppId = 'chat.fluffy.fluffychat';
   static const String ntfyTopicStoragePrefix = 'chat.fluffy.ntfy_topic.';
+  static const String ntfyTopicNoticePrefix =
+      'chat.fluffy.ntfy_topic_notice_shown.';
   static const double borderRadius = 18.0;
   static const double spaceBorderRadius = 11.0;
   static const double columnWidth = 360.0;
