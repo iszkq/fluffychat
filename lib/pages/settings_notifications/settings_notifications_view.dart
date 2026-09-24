@@ -221,14 +221,14 @@ class SettingsNotificationsView extends StatelessWidget {
                     ).client.getPushers(),
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
-                        Center(
+                        return Center(
                           child: Text(
                             snapshot.error!.toLocalizedString(context),
                           ),
                         );
                       }
                       if (snapshot.connectionState != ConnectionState.done) {
-                        const Center(
+                        return const Center(
                           child: CircularProgressIndicator.adaptive(
                             strokeWidth: 2,
                           ),

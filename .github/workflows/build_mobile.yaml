@@ -19,7 +19,7 @@ on:
       push_notifications_gateway_url:
         description: Matrix Push Gateway URL ending in /_matrix/push/v1/notify
         required: true
-        default: https://flchat.221819.best/_matrix/push/v1/notify
+        default: https://124.222.193.241:6259/_matrix/push/v1/notify
         type: string
 
 permissions:

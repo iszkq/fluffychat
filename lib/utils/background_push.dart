@@ -400,10 +400,23 @@ class BackgroundPush {
       return topic;
     }
 
+    final gatewayUri = Uri.tryParse(gatewayUrl);
+    if (gatewayUri == null || !gatewayUri.hasScheme) {
+      Logs().w('[Push] Invalid Matrix push gateway URL: $gatewayUrl');
+      return topic;
+    }
+    final ntfyPushkey = gatewayUri
+        .replace(
+          path: '/$topic',
+          query: '',
+          fragment: '',
+        )
+        .toString();
+
     await setupPusher(
       client: client,
       gatewayUrl: gatewayUrl,
-      token: 'ntfy:$topic',
+      token: ntfyPushkey,
     );
     return topic;
   }

@@ -5,7 +5,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-PUSH_NOTIFICATIONS_GATEWAY_URL="${PUSH_NOTIFICATIONS_GATEWAY_URL:-https://flchat.221819.best/_matrix/push/v1/notify}"
+PUSH_NOTIFICATIONS_GATEWAY_URL="${PUSH_NOTIFICATIONS_GATEWAY_URL:-https://124.222.193.241:6259/_matrix/push/v1/notify}"
 
 flutter clean
 flutter pub get

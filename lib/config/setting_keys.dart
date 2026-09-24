@@ -42,7 +42,7 @@ enum AppSettings<T> {
     'pushNotificationsGatewayUrl',
     String.fromEnvironment(
       'PUSH_NOTIFICATIONS_GATEWAY_URL',
-      defaultValue: 'https://flchat.221819.best/_matrix/push/v1/notify',
+      defaultValue: 'https://124.222.193.241:6259/_matrix/push/v1/notify',
     ),
   ),
   pushNotificationsPusherFormat<String>(

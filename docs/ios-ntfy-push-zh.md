@@ -5,6 +5,11 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 # iOS 侧载版 Matrix 推送
 
+当前 iOS 默认配置也支持 [自建 ntfy 直接作为 Matrix 网关](ntfy-matrix-direct-zh.md)。
+直连不需要 Cloudflare Function 或第二个容器，但通知内容是原始 Matrix JSON，
+点击通知无法保证打开 FluffyChat 对应房间。下文描述的是需要通知格式和房间跳转时
+使用的 Cloudflare Function 转换方案。
+
 这套方案不依赖你的 FluffyChat iOS 安装包拥有 Apple Push Notifications
 权限。主 App 不再声明 APNs entitlement；FluffyChat 把 Matrix Pusher 注册到仓库中的 Cloudflare Pages Function，
 Function 再把通知转发到 ntfy；ntfy iOS App 负责接收系统通知。

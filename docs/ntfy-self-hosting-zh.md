@@ -5,6 +5,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 # FluffyChat 自建 ntfy 迁移方案
 
+如果只需要现有 ntfy 容器直接接收 Matrix 推送，可使用
+[自建 ntfy 直接接收 Matrix 推送](ntfy-matrix-direct-zh.md)。
+该模式不提供点击通知直达 FluffyChat 房间的链接；下文仍描述带转换逻辑的方案。
+
 本文用于把当前 iOS 侧载版的通知中转，从公共 `https://ntfy.sh` 迁移到自己的
 ntfy 服务。适合交给 AI 或服务器管理员继续执行。
 

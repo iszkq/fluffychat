@@ -39,7 +39,7 @@ class NtfyTopicTile extends StatelessWidget {
                 ? (isChinese
                       ? '正在生成并保存本设备的专属主题…'
                       : 'Generating and saving this device\'s private topic…')
-                : 'ntfy.sh/$topic',
+                : topic,
           ),
           trailing: topic == null
               ? null
