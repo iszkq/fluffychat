@@ -1,0 +1,10 @@
+services:
+  fluffychat-push-gateway:
+    image: fluffychat-push-gateway:1.0
+    container_name: fluffychat-push-gateway
+    restart: unless-stopped
+    environment:
+      NTFY_BASE_URL: http://192.168.1.6:40265
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:41065:3000"
