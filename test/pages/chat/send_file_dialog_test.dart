@@ -9,8 +9,8 @@ import 'dart:typed_data';
 import 'package:cross_file/cross_file.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/send_file_dialog.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
 final _imageBytes = base64Decode(
@@ -120,7 +120,10 @@ Future<SendFileDialogState> _openDialog(
   await tester.pumpWidget(
     MaterialApp(
       locale: const Locale('en'),
-      localizationsDelegates: L10n.localizationsDelegates,
+      localizationsDelegates: [
+        ...L10n.localizationsDelegates,
+        ...GlobalMaterialLocalizations.delegates,
+      ],
       supportedLocales: L10n.supportedLocales,
       theme: ThemeData(platform: TargetPlatform.android),
       home: Scaffold(
