@@ -28,6 +28,7 @@ import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_shortcuts_new/flutter_shortcuts_new.dart';
 import 'package:go_router/go_router.dart';
+import 'package:livekit_client/livekit_client.dart' as lk;
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart' as sdk;
 import 'package:matrix/matrix.dart';
@@ -105,7 +106,7 @@ class ChatListController extends State<ChatList>
     _activeSpaceId = null;
   });
 
-  void _onCallEvent(CallEvent? event) {
+  Future<void> _onCallEvent(CallEvent? event) async {
     switch (event) {
       case CallEventActionCallAccept():
         _joinCallWith(event.callKitParams);
@@ -116,6 +117,18 @@ class ChatListController extends State<ChatList>
             Matrix.of(context).activeCallRoomId.value == roomId) {
           Matrix.of(context).activeCallRoomId.value = null;
         }
+        break;
+      case CallEventActionCallIncoming() || CallEventActionCallStart()
+          when PlatformInfos.isIOS:
+        // CallKit owns the iOS audio session until it activates the call.
+        // ignore: experimental_member_use
+        await lk.AudioManager.instance.setEngineAvailability(.none);
+        break;
+      case CallEventActionCallToggleAudioSession() when PlatformInfos.isIOS:
+        // ignore: experimental_member_use
+        await lk.AudioManager.instance.setEngineAvailability(
+          event.isActive ? .defaultAvailability : .none,
+        );
         break;
       default:
         break;
@@ -420,6 +433,12 @@ class ChatListController extends State<ChatList>
       _callEventSubscription = FlutterCallkitIncoming.onEvent.listen(
         _onCallEvent,
       );
+      if (PlatformInfos.isIOS) {
+        // ignore: experimental_member_use
+        lk.AudioManager.instance.setAudioSessionManagementMode(
+          lk.AudioSessionManagementMode.externalCallSystem,
+        );
+      }
       FlutterCallkitIncoming.activeCalls().then((calls) {
         final params = calls.firstOrNull;
         if (params == null) return;

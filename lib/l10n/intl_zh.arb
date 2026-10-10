@@ -2855,5 +2855,6 @@
     "voiceTranscriptionNotConfigured": "当前版本尚未配置语音转文字服务。",
     "collapse": "收起",
     "expand": "展开",
-    "playbackSpeed": "播放速度"
+    "playbackSpeed": "播放速度",
+    "sharedLocation": "分享位置"
 }

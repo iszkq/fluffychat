@@ -505,7 +505,6 @@ class ChatController extends State<ChatPageWithRoom>
       if (readMarkerEventIndex > 1) {
         Logs().v('Scroll up to visible event', readMarkerEventId);
         scrollToEventId(readMarkerEventId, highlightEvent: false);
-        return;
       } else if (readMarkerEventId.isNotEmpty && readMarkerEventIndex == -1) {
         _showScrollUpMaterialBanner(readMarkerEventId);
       }
@@ -591,7 +590,7 @@ class ChatController extends State<ChatPageWithRoom>
     setReadMarker();
   }
 
-  Future<void>? _setReadMarkerFuture;
+  String? _setReadMarkerEventId;
 
   void setReadMarker({String? eventId}) {
     // Do not send read markers when app is not in foreground
@@ -599,11 +598,10 @@ class ChatController extends State<ChatPageWithRoom>
       return;
     }
 
-    // We are already setting a read marker
-    if (_setReadMarkerFuture != null) return;
+    final setOnLatestEvent = eventId == null;
 
     // We only set read marker if we are at the bottom
-    if (_scrolledUp) return;
+    if (_scrolledUp && setOnLatestEvent) return;
 
     // We do not set read marker if we offer user the scroll up banner
     if (scrollUpBannerEventId != null) return;
@@ -619,12 +617,15 @@ class ChatController extends State<ChatPageWithRoom>
       return;
     }
 
-    final setOnLatestEvent = eventId == null;
-    eventId ??= timeline.events
-        .firstWhereOrNull(
-          (event) => room.client.pushruleEvaluator.match(event).notify,
-        )
-        ?.eventId;
+    eventId ??= timeline.events.firstWhereOrNull((event) {
+      if (event.eventId == room.lastEvent?.eventId) return true;
+      if (room.client.pushruleEvaluator.match(event).notify) return true;
+      final original = event.originalSource;
+      return original != null &&
+          room.client.pushruleEvaluator
+              .match(Event.fromMatrixEvent(original, room))
+              .notify;
+    })?.eventId;
 
     if (setOnLatestEvent && (room.hasNewMessages || room.isUnread)) {
       eventId ??=
@@ -636,6 +637,9 @@ class ChatController extends State<ChatPageWithRoom>
 
     // This is a sending event, we do not set a readmarker yet
     if (eventId.isValidMatrixIdStrict() == false) return;
+
+    // Only deduplicate requests for the same event.
+    if (_setReadMarkerEventId == eventId) return;
 
     // Already set a read marker on this event
     if (room.fullyRead == eventId && !setOnLatestEvent) return;
@@ -649,14 +653,18 @@ class ChatController extends State<ChatPageWithRoom>
     }
 
     Logs().d('Set read marker...', eventId);
+    _setReadMarkerEventId = eventId;
     // ignore: unawaited_futures
-    _setReadMarkerFuture = timeline
+    timeline
         .setReadMarker(
           eventId: eventId,
           public: AppSettings.sendPublicReadReceipts.value,
         )
-        .then((_) {
-          _setReadMarkerFuture = null;
+        .whenComplete(() {
+          if (_setReadMarkerEventId == eventId) _setReadMarkerEventId = null;
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          Logs().w('Unable to set read marker', error, stackTrace);
         });
   }
 
@@ -1280,10 +1288,26 @@ class ChatController extends State<ChatPageWithRoom>
   Future<void> scrollToEventId(
     String eventId, {
     bool highlightEvent = true,
+    bool timelineReloaded = false,
   }) async {
+    if (!mounted || timeline == null) return;
     final foundEvent = timeline!.events.firstWhereOrNull(
       (event) => event.eventId == eventId,
     );
+
+    final threadRootId =
+        foundEvent?.relationshipType == RelationshipTypes.thread
+        ? foundEvent?.relationshipEventId
+        : null;
+    if (activeThreadId == null &&
+        threadRootId != null &&
+        threadRootId != eventId) {
+      return scrollToEventId(
+        threadRootId,
+        highlightEvent: highlightEvent,
+        timelineReloaded: timelineReloaded,
+      );
+    }
 
     final eventIndex = foundEvent == null
         ? -1
@@ -1295,6 +1319,7 @@ class ChatController extends State<ChatPageWithRoom>
               .indexOf(foundEvent);
 
     if (eventIndex == -1) {
+      if (foundEvent != null || timelineReloaded) return;
       setState(() {
         timeline = null;
         _scrolledUp = false;
@@ -1306,8 +1331,13 @@ class ChatController extends State<ChatPageWithRoom>
         );
       });
       await loadTimelineFuture;
+      if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-        scrollToEventId(eventId);
+        scrollToEventId(
+          eventId,
+          highlightEvent: highlightEvent,
+          timelineReloaded: true,
+        );
       });
       return;
     }

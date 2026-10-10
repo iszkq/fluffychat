@@ -2838,5 +2838,6 @@
     "voiceTranscriptionNotConfigured": "Voice transcription is not configured for this build.",
     "collapse": "Collapse",
     "expand": "Expand",
-    "playbackSpeed": "Playback speed"
+    "playbackSpeed": "Playback speed",
+    "sharedLocation": "Shared location"
 }

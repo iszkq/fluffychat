@@ -65,9 +65,8 @@ class UrlLauncher {
     if (!{'https', 'http'}.contains(uri.scheme)) {
       // just launch non-https / non-http uris directly
 
-      // we need to transmute geo URIs on desktop and on iOS
-      if ((!PlatformInfos.isMobile || PlatformInfos.isIOS) &&
-          uri.scheme == 'geo') {
+      // Map apps need platform-specific URI parameters to show a pin.
+      if (uri.scheme == 'geo') {
         final latlong = uri.path
             .split(';')
             .first
@@ -83,6 +82,10 @@ class UrlLauncher {
             // https://developer.apple.com/library/archive/featuredarticles/iPhoneURLScheme_Reference/MapLinks/MapLinks.html
             final ll = '${latlong.first},${latlong.last}';
             launchUrlString('https://maps.apple.com/?q=$ll&sll=$ll');
+          } else if (PlatformInfos.isAndroid) {
+            final ll = '${latlong.first},${latlong.last}';
+            final label = Uri.encodeComponent(l10n.sharedLocation);
+            launchUrlString('geo:$ll?q=$ll($label)');
           } else {
             // transmute geo URIs on desktop to openstreetmap links, as those usually can't handle
             // geo URIs
