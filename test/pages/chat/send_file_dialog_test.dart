@@ -142,6 +142,7 @@ Future<SendFileDialogState> _openDialog(
       ),
     ),
   );
+  await tester.pumpAndSettle();
   await tester.tap(find.text('Open files'));
   await tester.pumpAndSettle();
   return tester.state<SendFileDialogState>(find.byType(SendFileDialog));
