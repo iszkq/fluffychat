@@ -73,7 +73,7 @@ class _SentFile {
 
 class _TestRoom implements Room {
   @override
-  final client = _DelayedConfigClient();
+  final _DelayedConfigClient client = _DelayedConfigClient();
 
   @override
   bool get encrypted => false;

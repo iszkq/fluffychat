@@ -63,9 +63,9 @@ dependencies:
   lottie: ^3.5.1
   managed_configurations: ^1.2.0
   material_ui: 1.2.0
-  # Use the published SDK release: old Git revisions can disappear after
-  # upstream force-pushes and prevent clean package builds.
-  matrix: 12.0.1
+  # Use a published SDK release with the same database schema as the previous
+  # Git revision, so clean builds do not depend on unavailable Git objects.
+  matrix: 14.0.0
   media_kit_libs_linux: ^1.2.1
   media_kit_libs_windows_audio: ^1.0.9
   mime: ^2.1.0
