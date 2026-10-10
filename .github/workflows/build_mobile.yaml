@@ -41,6 +41,11 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Verify photo sending regressions
+        run: |
+          flutter pub get
+          flutter test test/pages/chat/send_file_dialog_test.dart
+
       - name: Configure stable release signing
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

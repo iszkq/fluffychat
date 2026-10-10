@@ -14,6 +14,7 @@ import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/image_edit_geometry.dart';
 import 'package:fluffychat/pages/chat/trust_user_key_dialog.dart';
+import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_file_extension.dart';
 import 'package:fluffychat/utils/other_party_can_receive.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
@@ -49,6 +50,7 @@ class SendFileDialog extends StatefulWidget {
 
 class SendFileDialogState extends State<SendFileDialog> {
   bool compress = true;
+  bool _sending = false;
 
   /// Images smaller than 20kb don't need compression.
   static const int minSizeToCompress = 20 * 1000;
@@ -82,38 +84,49 @@ class SendFileDialogState extends State<SendFileDialog> {
     });
   }
 
-  Future<void> _send(String? uniqueFileType) async {
+  Future<void> _send() async {
+    if (_sending) return;
+
+    // Keep upload inputs stable after closing the dialog, including the caption
+    // whose controller will be disposed with it.
+    final room = widget.room;
+    final outerContext = widget.outerContext;
+    final threadRootEventId = widget.threadRootEventId;
+    final threadLastEventId = widget.threadLastEventId;
+    final files = List<XFile>.of(_files);
+    final shouldCompress = compress;
+    final label = _labelTextController.text.trim();
     final l10n = L10n.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(widget.outerContext);
+    final scaffoldMessenger = ScaffoldMessenger.of(outerContext);
+    var sendingStarted = false;
+    Object? sendError;
+    setState(() => _sending = true);
 
-    final proceed = await showTrustUserInRoomDialog(
-      widget.outerContext,
-      widget.room,
-    );
-    if (!context.mounted || !proceed) return;
-
-    if (ForegroundServices.platformSupported) {
-      await ForegroundServices.startService('send_files');
-    } else {
-      scaffoldMessenger.showLoadingSnackBar(
-        l10n.sendingFilesDoNotExit(widget.files.length),
-      );
-    }
     try {
-      if (!widget.room.otherPartyCanReceiveMessages) {
+      final proceed = await showTrustUserInRoomDialog(outerContext, room);
+      if (!mounted || !proceed) return;
+
+      if (!room.otherPartyCanReceiveMessages) {
         throw OtherPartyCanNotReceiveMessages();
+      }
+
+      sendingStarted = true;
+      scaffoldMessenger.showLoadingSnackBar(
+        l10n.sendingFilesDoNotExit(files.length),
+      );
+      if (ForegroundServices.platformSupported) {
+        await ForegroundServices.startService('send_files');
       }
       if (!mounted) return;
       Navigator.of(context, rootNavigator: false).pop();
-      final clientConfig = await Result.capture(widget.room.client.getConfig());
+      final clientConfig = await Result.capture(room.client.getConfig());
       final maxUploadSize =
           clientConfig.asValue?.value.mUploadSize ?? 100 * 1000 * 1000;
 
-      for (var i = 0; i < _files.length; i++) {
-        final xfile = _files[i];
-        final MatrixFile file;
+      for (final xfile in files) {
+        MatrixFile file;
         MatrixImageFile? thumbnail;
-        final mimeType = xfile.mimeType ?? lookupMimeType(xfile.path);
+        final mimeType = xfile.mimeType ?? lookupMimeType(xfile.name);
 
         // Generate video thumbnail
         if (PlatformInfos.isMobile &&
@@ -131,37 +144,51 @@ class SendFileDialogState extends State<SendFileDialog> {
           scaffoldMessenger.clearSnackBars();
           scaffoldMessenger.showLoadingSnackBar(l10n.compressingVideo);
           file = await xfile.getVideoInfo(
-            compress: length != null && length > minSizeToCompress && compress,
+            compress:
+                length != null && length > minSizeToCompress && shouldCompress,
           );
           scaffoldMessenger.clearSnackBars();
-          if (!ForegroundServices.platformSupported) {
-            scaffoldMessenger.showLoadingSnackBar(
-              l10n.sendingFilesDoNotExit(widget.files.length),
-            );
-          }
+          scaffoldMessenger.showLoadingSnackBar(
+            l10n.sendingFilesDoNotExit(files.length),
+          );
         } else {
           // Else we just create a MatrixFile
           file = MatrixFile(
-            bytes: await _files[i].readAsBytes(),
+            bytes: await xfile.readAsBytes(),
             name: xfile.name,
             mimeType: mimeType,
           ).detectFileType;
+        }
+
+        if (shouldCompress && file is MatrixImageFile) {
+          try {
+            // Resize before checking the limit and passing the file to the SDK.
+            // The pinned SDK retains the original uploadFile when it resizes
+            // an image in an unencrypted room.
+            file = await MatrixImageFile.shrink(
+              bytes: file.bytes,
+              name: file.name,
+              mimeType: file.mimeType,
+              maxDimension: 1600,
+              customImageResizer: room.client.customImageResizer,
+              nativeImplementations: room.client.nativeImplementations,
+            );
+          } catch (e, s) {
+            Logs().w('Unable to compress image, sending original', e, s);
+          }
         }
 
         if (file.bytes.length > maxUploadSize) {
           throw FileTooBigMatrixException(file.bytes.length, maxUploadSize);
         }
 
-        final label = _labelTextController.text.trim();
-
         try {
-          await widget.room.sendFileEvent(
+          await room.sendFileEvent(
             file,
             thumbnail: thumbnail,
-            shrinkImageMaxDimension: compress ? 1600 : null,
             extraContent: label.isEmpty ? null : {'body': label},
-            threadRootEventId: widget.threadRootEventId,
-            threadLastEventId: widget.threadLastEventId,
+            threadRootEventId: threadRootEventId,
+            threadLastEventId: threadLastEventId,
           );
         } on MatrixException catch (e) {
           final retryAfterMs = e.retryAfterMs;
@@ -174,23 +201,39 @@ class SendFileDialogState extends State<SendFileDialog> {
 
           await Future.delayed(retryAfterDuration);
 
-          await widget.room.sendFileEvent(
+          await room.sendFileEvent(
             file,
             thumbnail: thumbnail,
-            shrinkImageMaxDimension: compress ? 1600 : null,
             extraContent: label.isEmpty ? null : {'body': label},
+            threadRootEventId: threadRootEventId,
+            threadLastEventId: threadLastEventId,
           );
         }
       }
+    } catch (e, s) {
+      Logs().w('Unable to send files', e, s);
+      sendError = e;
     } finally {
-      if (ForegroundServices.platformSupported) {
-        await ForegroundServices.stopService('send_files');
-      } else {
-        scaffoldMessenger.clearSnackBars();
+      if (sendingStarted) {
+        if (ForegroundServices.platformSupported) {
+          await ForegroundServices.stopService('send_files');
+        }
+        if (scaffoldMessenger.mounted) scaffoldMessenger.clearSnackBars();
       }
+      if (mounted) setState(() => _sending = false);
     }
 
-    return;
+    if (sendError != null &&
+        outerContext.mounted &&
+        scaffoldMessenger.mounted) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '${l10n.couldNotBeSent}\n${sendError.toLocalizedString(outerContext)}',
+          ),
+        ),
+      );
+    }
   }
 
   Future<String> _calcCombinedFileSize() async {
@@ -342,7 +385,9 @@ class SendFileDialogState extends State<SendFileDialog> {
                                           color: Colors.white,
                                           size: 20,
                                         ),
-                                        onPressed: () => _editImage(i),
+                                        onPressed: _sending
+                                            ? null
+                                            : () => _editImage(i),
                                       ),
                                     ),
                                   ),
@@ -414,14 +459,14 @@ class SendFileDialogState extends State<SendFileDialog> {
                         }.contains(theme.platform))
                           CupertinoSwitch(
                             value: compressionSupported && compress,
-                            onChanged: compressionSupported
+                            onChanged: compressionSupported && !_sending
                                 ? (v) => setState(() => compress = v)
                                 : null,
                           )
                         else
                           Switch.adaptive(
                             value: compressionSupported && compress,
-                            onChanged: compressionSupported
+                            onChanged: compressionSupported && !_sending
                                 ? (v) => setState(() => compress = v)
                                 : null,
                           ),
@@ -462,12 +507,13 @@ class SendFileDialogState extends State<SendFileDialog> {
           ),
           actions: <Widget>[
             AdaptiveDialogAction(
-              onPressed: () =>
-                  Navigator.of(context, rootNavigator: false).pop(),
+              onPressed: _sending
+                  ? null
+                  : () => Navigator.of(context, rootNavigator: false).pop(),
               child: Text(L10n.of(context).cancel),
             ),
             AdaptiveDialogAction(
-              onPressed: () => _send(uniqueFileType),
+              onPressed: _sending ? null : _send,
               child: Text(L10n.of(context).send),
             ),
           ],
