@@ -127,6 +127,7 @@ class ChatListController extends State<ChatList>
       case CallEventActionCallToggleAudioSession() when PlatformInfos.isIOS:
         // ignore: experimental_member_use
         await lk.AudioManager.instance.setEngineAvailability(
+          // ignore: experimental_member_use
           event.isActive ? .defaultAvailability : .none,
         );
         break;
@@ -436,6 +437,7 @@ class ChatListController extends State<ChatList>
       if (PlatformInfos.isIOS) {
         // ignore: experimental_member_use
         lk.AudioManager.instance.setAudioSessionManagementMode(
+          // ignore: experimental_member_use
           lk.AudioSessionManagementMode.externalCallSystem,
         );
       }

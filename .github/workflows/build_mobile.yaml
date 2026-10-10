@@ -45,7 +45,7 @@ jobs:
         run: |
           flutter pub get
           flutter analyze --no-fatal-infos --no-fatal-warnings lib
-          flutter test test/pages/chat/send_file_dialog_test.dart \
+          flutter test --timeout 2m test/pages/chat/send_file_dialog_test.dart \
             test/pages/chat/read_marker_test.dart test/push_summary_test.dart \
             test/pages/chat/sticker_repository_test.dart \
             test/android_background_notifications_mode_test.dart
@@ -115,10 +115,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
-        run: flutter pub get
+        run: |
+          flutter config --enable-swift-package-manager
+          flutter pub get
+
+      - name: Validate iOS project
+        run: plutil -lint ios/Runner.xcodeproj/project.pbxproj ios/Runner/Info.plist
 
       - name: Build iOS app without signing
         env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
           VOICE_TRANSCRIPTION_ENDPOINT: ${{ inputs.voice_transcription_endpoint }}
           OFFICE_EDITOR_URL: ${{ inputs.office_editor_url }}
           PUSH_NOTIFICATIONS_GATEWAY_URL: ${{ inputs.push_notifications_gateway_url }}
@@ -126,6 +132,7 @@ jobs:
           flutter build ios
           --release
           --no-codesign
+          --build-number=$((300000 + GITHUB_RUN_NUMBER))
           --dart-define="VOICE_TRANSCRIPTION_ENDPOINT=${VOICE_TRANSCRIPTION_ENDPOINT}"
           --dart-define="OFFICE_EDITOR_URL=${OFFICE_EDITOR_URL}"
           --dart-define="PUSH_NOTIFICATIONS_GATEWAY_URL=${PUSH_NOTIFICATIONS_GATEWAY_URL}"

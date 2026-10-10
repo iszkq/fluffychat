@@ -20,16 +20,18 @@
 
 ## 验证
 
-已核对 Matrix 14、LiveKit 2.12.0、CallKit 3.1.5、UnifiedPush Android 3.4.1 的相关源码接口。本地 Dart 格式、差异、ARB JSON 与 Android manifest XML 检查通过。本机没有 Flutter；新增测试尚未执行，静态分析与平台编译须在 GitHub Actions 验证。
+已核对 Matrix 14、LiveKit/CallKit、UnifiedPush Android 3.4.1 的相关源码接口。本地 Dart 格式、差异、ARB JSON 与 Android manifest XML 检查通过。已安装任务专用 Flutter 3.47.4，配套升级依赖解析成功，整个 lib 静态分析无错误。本地 Windows 测试被缺少 CMake 的原生依赖构建拦截，测试和平台编译交给 GitHub Actions 验证。
 
-当前改动尚未提交或上传，远端 main 仍为上述比较基线，未启动新构建。自动审批服务在提交命令上连续超时，命令未执行；这次是审批服务失败，不是新的风险拒绝。已请求继续提交、上传和启动构建的确认。
+前三批已上传：`3ed9fe95b`。该提交的 iOS 与 Web 构建成功。Android 新增已读测试初始化 Client 时缺少数据库，已修正；后续数据库初始化在 widget 假时钟中停住，现改用仅模拟发送接口的 Client，以便独立验证并发与失败重试。最终构建会执行照片、已读、汇总通知、云贴纸、常驻模式回归检查。
 
 构建通过不能替代真机验证：需要检查旧消息解密、多设备验证、锁屏接听、音频路由、返回键退出后推送和冷启动。初始化加密身份本身会重建秘密存储、备份与交叉签名，新增流程会在已连接时先下载备份。
 
 ## 后续配套迁移
 
-原生图片、分享和文件选择依赖与 Apple Swift Package 工程迁移尚未实施。已核对升级说明：native_imaging 1.0.0 新增 Swift Package 并要求 iOS 15；receive_sharing_intent 1.9.0 移除 CocoaPods，要求 Scene 生命周期和 Share Extension 的 Swift Package 产品链接；file_picker 13 移除旧参数并将文件长度改为可空值。当前 Flutter 版本与 Scene 配置满足部分前提，但仍需配套原生工程、分享扩展和 lock 更新及构建验证。
+已配套升级 native_imaging 1.0.0、receive_sharing_intent 1.9.0、file_picker 13.1.0，以及上游 UI、视频、设备信息、CallKit、安全存储等版本约束。保留固定 Matrix 14 和本仓库 Opus/WebView 依赖，并用 Flutter pub get 生成 lock。
 
-桌面安装器、商店发布和完整翻译合并按实际分发渠道处理，不直接替换本仓库发布目标。
+iOS 采用上游 Swift Package 工程与动态 SQLCipher 通知数据库封装，移除 CocoaPods；补通知房间名称/头像元数据；保留 Scene 配置、无 App Group 回退和 SideStore 打包。分享扩展采用新插件提供的自动跳转，去掉旧的延时发送补丁。iOS/Android 构建均生成递增 build number。
+
+macOS/Windows 桌面工程、安装器、商店发布和完整翻译合并不在本轮移动端安装包范围内；不替换本仓库发布目标。
 
 本次分批移植，不是完整合并 174 个上游提交。原始差异见 `upstream-feature-comparison-2026-10-10.md`。

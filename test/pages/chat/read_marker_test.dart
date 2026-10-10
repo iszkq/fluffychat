@@ -10,7 +10,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix/matrix.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../utils/test_client.dart';
+class _ReadClient implements Client {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 class _ReadTimeline implements Timeline {
   @override
@@ -50,10 +53,7 @@ void main() {
     tester,
   ) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    final room = Room(
-      id: '!room:example.org',
-      client: await prepareTestClient(id: 'read-marker'),
-    );
+    final room = Room(id: '!room:example.org', client: _ReadClient());
     final timeline = _ReadTimeline([
       Event(
         eventId: '\$first:example.org',
@@ -85,10 +85,7 @@ void main() {
     tester,
   ) async {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    final room = Room(
-      id: '!room:example.org',
-      client: await prepareTestClient(id: 'read-marker'),
-    );
+    final room = Room(id: '!room:example.org', client: _ReadClient());
     final timeline = _ReadTimeline([
       Event(
         eventId: '\$first:example.org',
