@@ -63,12 +63,9 @@ dependencies:
   lottie: ^3.5.1
   managed_configurations: ^1.2.0
   material_ui: 1.2.0
-  matrix: #^11.0.0
-    git:
-      url: https://github.com/famedly/matrix-dart-sdk.git
-      # The branch is force-pushed upstream. Pin a reachable revision so clean
-      # GitHub Actions builds do not fail when an old commit disappears.
-      ref: cbf84c6f384b5fb5a6654c7e2396b04f67e67658
+  # Use the published SDK release: old Git revisions can disappear after
+  # upstream force-pushes and prevent clean package builds.
+  matrix: 12.0.1
   media_kit_libs_linux: ^1.2.1
   media_kit_libs_windows_audio: ^1.0.9
   mime: ^2.1.0
