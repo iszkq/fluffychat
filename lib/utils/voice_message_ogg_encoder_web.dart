@@ -13,6 +13,7 @@ import 'voice_message_ogg_converter.dart' show packageOpusPacketsAsOgg;
 
 const _opusSampleRate = 48000;
 const _opusFrameSamples = 960; // 20 ms at 48 kHz.
+const _opusPreSkip = 312;
 
 Future<void>? _opusInitialization;
 
@@ -42,7 +43,9 @@ Future<Uint8List> encodeWavVoiceMessageToOgg(Uint8List bytes) async {
   );
   final outputFrameCount = (wav.frameCount * _opusSampleRate / wav.sampleRate)
       .round();
-  final packetCount = (outputFrameCount / _opusFrameSamples).ceil();
+  // Flush the encoder delay so pre-skip does not remove the recording's tail.
+  final packetCount = ((outputFrameCount + _opusPreSkip) / _opusFrameSamples)
+      .ceil();
   final packets = <Uint8List>[];
 
   try {
@@ -80,6 +83,7 @@ Future<Uint8List> encodeWavVoiceMessageToOgg(Uint8List bytes) async {
     channels: wav.channels,
     inputSampleRate: wav.sampleRate,
     validSamplesPerChannel: outputFrameCount,
+    preSkip: _opusPreSkip,
   );
 }
 

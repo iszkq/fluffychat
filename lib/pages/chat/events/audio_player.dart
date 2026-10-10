@@ -14,13 +14,13 @@ import 'package:fluffychat/services/voice_transcription_service.dart';
 import 'package:fluffychat/utils/file_description.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/url_launcher.dart';
+import 'package:fluffychat/utils/voice_message_caf_converter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
-import 'package:ogg_caf_converter/ogg_caf_converter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:universal_html/html.dart' as html;
 
@@ -62,9 +62,11 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
   String? _transcription;
   bool _isTranscribing = false;
   bool _transcriptionExpanded = true;
+  StreamSubscription<PlayerException>? _playbackErrorSubscription;
 
   @override
   void dispose() {
+    _playbackErrorSubscription?.cancel();
     super.dispose();
     final audioPlayer = matrix.voiceMessageEventId.value != widget.event.eventId
         ? null
@@ -136,6 +138,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
   }
 
   Future<void> _onButtonTap() async {
+    if (status == AudioPlayerStatus.downloading) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ScaffoldMessenger.of(matrix.context).clearMaterialBanners();
     });
@@ -145,23 +148,25 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
         : matrix.audioPlayer;
     if (currentPlayer != null && !currentPlayer.isAtEndPosition) {
       if (currentPlayer.playing) {
-        currentPlayer.pause();
+        await currentPlayer.pause();
       } else {
-        currentPlayer.play();
+        await _play(currentPlayer);
       }
       return;
     }
 
-    matrix.voiceMessageEventId.value = widget.event.eventId;
-    matrix.audioPlayer
-      ?..stop()
-      ..dispose();
+    final previousPlayer = matrix.audioPlayer;
+    unawaited(_playbackErrorSubscription?.cancel());
+    _playbackErrorSubscription = null;
+    matrix.audioPlayer = null;
     matrix.revokeAudioObjectUrl();
+    matrix.voiceMessageEventId.value = widget.event.eventId;
     File? file;
     MatrixFile? matrixFile;
 
     setState(() => status = AudioPlayerStatus.downloading);
     try {
+      await previousPlayer?.dispose();
       final fileSize = widget.event.content
           .tryGetMap<String, Object?>('info')
           ?.tryGet<int>('size');
@@ -179,35 +184,32 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
             : null,
       );
 
-      final attachmentUrl = widget.event.attachmentOrThumbnailMxcUrl();
       final audioFormat = _detectAudioFormat(matrixFile);
 
-      if (!kIsWeb && attachmentUrl != null) {
+      if (!kIsWeb) {
         final tempDir = await getTemporaryDirectory();
-        final fileName = Uri.encodeComponent(attachmentUrl.pathSegments.last);
-        file = File('${tempDir.path}/$fileName.${audioFormat.extension}');
-
-        await file.writeAsBytes(matrixFile.bytes);
-
+        // Give every load its own file so another player cannot overwrite a
+        // file still in use. Rebuild conversions instead of reusing old CAFs
+        // whose packet sizes or sample rate may be corrupt.
+        final fileName = 'voice_${DateTime.now().microsecondsSinceEpoch}';
         if (Platform.isIOS && audioFormat.isOgg) {
           Logs().v('Convert ogg audio file for iOS...');
-          final convertedFile = File('${file.path}.caf');
-          if (await convertedFile.exists() == false) {
-            await OggCafConverter().convertOggToCaf(
-              input: file.path,
-              output: convertedFile.path,
-            );
-          }
-          file = convertedFile;
+          final caf = await compute(convertOggOpusToCaf, matrixFile.bytes);
+          file = File('${tempDir.path}/$fileName.caf');
+          await file.writeAsBytes(caf, flush: true);
+        } else {
+          file = File('${tempDir.path}/$fileName.${audioFormat.extension}');
+          await file.writeAsBytes(matrixFile.bytes, flush: true);
         }
       }
 
       if (!mounted) return;
-      setState(() {
-        status = AudioPlayerStatus.downloaded;
-      });
     } catch (e, s) {
       Logs().v('Could not download audio file', e, s);
+      if (matrix.voiceMessageEventId.value == widget.event.eventId &&
+          matrix.audioPlayer == null) {
+        matrix.voiceMessageEventId.value = null;
+      }
       if (!mounted) return;
       setState(() => status = AudioPlayerStatus.notDownloaded);
       ScaffoldMessenger.of(
@@ -216,9 +218,15 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
       return;
     }
     if (!context.mounted) return;
-    if (matrix.voiceMessageEventId.value != widget.event.eventId) return;
+    if (matrix.voiceMessageEventId.value != widget.event.eventId) {
+      setState(() => status = AudioPlayerStatus.notDownloaded);
+      return;
+    }
 
     final audioPlayer = matrix.audioPlayer = AudioPlayer();
+    _playbackErrorSubscription = audioPlayer.errorStream.listen((error) {
+      unawaited(_handlePlaybackError(audioPlayer, error, StackTrace.current));
+    });
 
     try {
       if (file != null) {
@@ -241,19 +249,49 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
           ),
         );
       }
-      if (!mounted) return;
+      if (!mounted || matrix.audioPlayer != audioPlayer) {
+        await audioPlayer.dispose();
+        return;
+      }
+      setState(() => status = AudioPlayerStatus.downloaded);
+      await _play(audioPlayer);
+    } catch (e, s) {
+      await _handlePlaybackError(audioPlayer, e, s);
+    } finally {
+      if (mounted && status == AudioPlayerStatus.downloading) {
+        setState(() => status = AudioPlayerStatus.notDownloaded);
+      }
+    }
+  }
+
+  Future<void> _play(AudioPlayer audioPlayer) async {
+    try {
       await audioPlayer.play();
     } catch (e, s) {
-      Logs().w('Unable to play audio message', e, s);
-      await audioPlayer.dispose();
-      matrix.revokeAudioObjectUrl();
-      matrix.voiceMessageEventId.value = matrix.audioPlayer = null;
-      if (!mounted) return;
-      setState(() => status = AudioPlayerStatus.notDownloaded);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
+      await _handlePlaybackError(audioPlayer, e, s);
     }
+  }
+
+  Future<void> _handlePlaybackError(
+    AudioPlayer audioPlayer,
+    Object error,
+    StackTrace stackTrace,
+  ) async {
+    Logs().w('Unable to play audio message', error, stackTrace);
+    // A superseded load can fail after the user starts another message.
+    // Its cleanup must never stop the newer player or revoke its object URL.
+    if (matrix.audioPlayer != audioPlayer) return;
+    matrix.audioPlayer = null;
+    unawaited(_playbackErrorSubscription?.cancel());
+    _playbackErrorSubscription = null;
+    matrix.revokeAudioObjectUrl();
+    matrix.voiceMessageEventId.value = null;
+    await audioPlayer.dispose();
+    if (!mounted) return;
+    setState(() => status = AudioPlayerStatus.notDownloaded);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(error.toLocalizedString(context))));
   }
 
   ({String extension, String mimeType, bool isOgg}) _detectAudioFormat(
@@ -280,6 +318,9 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
     }
     if (startsWith(const [0x66, 0x4c, 0x61, 0x43])) {
       return (extension: 'flac', mimeType: 'audio/flac', isOgg: false);
+    }
+    if (startsWith(const [0x63, 0x61, 0x66, 0x66])) {
+      return (extension: 'caf', mimeType: 'audio/x-caf', isOgg: false);
     }
     // ADTS AAC also starts with an MPEG-style 0xff sync byte, so it must be
     // detected before the broader MP3 frame check below.

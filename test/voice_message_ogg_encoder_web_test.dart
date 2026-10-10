@@ -18,6 +18,21 @@ void main() {
     expect(ascii.decode(ogg.sublist(0, 4)), 'OggS');
     expect(_containsAscii(ogg, 'OpusHead'), isTrue);
     expect(_containsAscii(ogg, 'OpusTags'), isTrue);
+    // 100 ms of input plus the 312-sample encoder delay. The delay must be
+    // flushed in an additional packet so the last speech samples survive.
+    var offset = 0;
+    var finalGranule = 0;
+    while (offset < ogg.length) {
+      final segments = ogg[offset + 26];
+      final bodySize = ogg
+          .sublist(offset + 27, offset + 27 + segments)
+          .fold<int>(0, (sum, size) => sum + size);
+      finalGranule = ByteData.sublistView(
+        ogg,
+      ).getUint32(offset + 6, Endian.little);
+      offset += 27 + segments + bodySize;
+    }
+    expect(finalGranule, 4800 + 312);
   });
 }
 

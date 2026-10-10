@@ -74,7 +74,9 @@ class _OpusStream {
     final output = BytesBuilder(copy: false);
     final serial = DateTime.now().microsecondsSinceEpoch.toUnsigned(32);
     var sequence = 0;
-    var granule = ByteData.sublistView(head).getUint16(10, Endian.little);
+    // Granules count decoded samples, including the encoder's priming. The
+    // pre-skip belongs in OpusHead and must not be added a second time here.
+    var granule = 0;
     var previousPageGranule = 0;
 
     output.add(
@@ -452,11 +454,18 @@ class _CafOpusReader {
       );
       packetOffset += size;
     }
-    final preSkip = primingFrames.clamp(0, 65535);
+    if (sampleRate <= 0) {
+      throw const FormatException('Invalid CAF sample rate');
+    }
+    final preSkip = (primingFrames * 48000 / sampleRate).round().clamp(
+      0,
+      65535,
+    );
+    final validSamples = (validFrames * 48000 / sampleRate).round();
     return _OpusStream(
       head: _createOpusHead(channels, preSkip, sampleRate),
       packets: packets,
-      finalGranulePosition: validFrames > 0 ? preSkip + validFrames : null,
+      finalGranulePosition: validFrames > 0 ? preSkip + validSamples : null,
     ).toOgg();
   }
 }
