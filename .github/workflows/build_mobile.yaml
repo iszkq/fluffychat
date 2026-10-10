@@ -144,6 +144,18 @@ jobs:
           cd build/unsigned-ipa
           zip -qry ../../fluffychat-ios-unsigned.ipa Payload
 
+      - name: Save Swift Package diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-swift-package-diagnostics
+          path: |
+            ios/Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage/Package.swift
+            ios/Flutter/ephemeral/Packages/.packages/FlutterFramework/Package.swift
+            ios/Runner.xcodeproj/project.pbxproj
+          include-hidden-files: true
+          retention-days: 7
+
       - name: Package SideStore-compatible IPA
         run: |
           mkdir -p build/sideload-ipa/Payload

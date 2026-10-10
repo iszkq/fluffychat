@@ -17,7 +17,7 @@
 		C1005C45261071B5002F4F32 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1005C44261071B5002F4F32 /* ShareViewController.swift */; };
 		C1005C48261071B5002F4F32 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C1005C46261071B5002F4F32 /* MainInterface.storyboard */; };
 		C1005C4C261071B5002F4F32 /* FluffyChat Share.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = C1005C42261071B5002F4F32 /* FluffyChat Share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		C11184F53072567E00575032 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = C11184F43072567E00575032 /* FlutterGeneratedPluginSwiftPackage */; };
+		C11184F53072567E00575032 /* receive-sharing-intent in Frameworks */ = {isa = PBXBuildFile; productRef = C11184F43072567E00575032 /* receive-sharing-intent */; };
 		C137635E2AD1446100A8F905 /* notification.caf in Resources */ = {isa = PBXBuildFile; fileRef = C137635D2AD1446100A8F905 /* notification.caf */; };
 		C14695592E642D400075F2F7 /* Notification Service Extension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = C14695522E642D400075F2F7 /* Notification Service Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C14695662E642E450075F2F7 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = C14695652E642E450075F2F7 /* Localizable.xcstrings */; };
@@ -129,7 +129,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C11184F53072567E00575032 /* FlutterGeneratedPluginSwiftPackage in Frameworks */,
+				C11184F53072567E00575032 /* receive-sharing-intent in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -257,7 +257,7 @@
 			);
 			name = "FluffyChat Share";
 			packageProductDependencies = (
-				C11184F43072567E00575032 /* FlutterGeneratedPluginSwiftPackage */,
+				C11184F43072567E00575032 /* receive-sharing-intent */,
 			);
 			productName = "FluffyChat Share";
 			productReference = C1005C42261071B5002F4F32 /* FluffyChat Share.appex */;
@@ -318,6 +318,7 @@
 			mainGroup = 97C146E51CF9000F007C117D;
 			packageReferences = (
 				781AD8BC2B33823900A9FFBB /* XCLocalSwiftPackageReference "Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage" */,
+				C2FC029BABB0407298D01001 /* XCLocalSwiftPackageReference "receive_sharing_intent" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 97C146EF1CF9000F007C117D /* Products */;
@@ -1008,6 +1009,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage;
 		};
+		C2FC029BABB0407298D01001 /* XCLocalSwiftPackageReference "receive_sharing_intent" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "Flutter/ephemeral/Packages/.packages/receive_sharing_intent-1.9.0";
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1015,9 +1020,10 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = FlutterGeneratedPluginSwiftPackage;
 		};
-		C11184F43072567E00575032 /* FlutterGeneratedPluginSwiftPackage */ = {
+		C11184F43072567E00575032 /* receive-sharing-intent */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = FlutterGeneratedPluginSwiftPackage;
+			package = C2FC029BABB0407298D01001 /* XCLocalSwiftPackageReference "receive_sharing_intent" */;
+			productName = "receive-sharing-intent";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
