@@ -103,6 +103,7 @@ Uint8List convertOggOpusToCaf(Uint8List bytes) {
   final audio = BytesBuilder(copy: false)..add(Uint8List(4)); // Edit count.
   for (var index = 0; index < audioPackets.length; index++) {
     table.add(_varint(audioPackets[index].length));
+    if (fixedFrames == 0) table.add(_varint(frameCounts[index]));
     audio.add(audioPackets[index]);
   }
   final output = BytesBuilder(copy: false)

@@ -48,6 +48,7 @@ jobs:
           flutter test --timeout 2m test/pages/chat/send_file_dialog_test.dart \
             test/pages/chat/read_marker_test.dart test/push_summary_test.dart \
             test/pages/chat/sticker_repository_test.dart \
+            test/voice_message_caf_converter_test.dart \
             test/android_background_notifications_mode_test.dart
 
       - name: Configure stable release signing

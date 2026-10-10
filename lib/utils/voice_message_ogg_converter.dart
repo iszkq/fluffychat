@@ -381,6 +381,7 @@ class _CafOpusReader {
     var channels = 1;
     var sampleRate = 48000;
     var bytesPerPacket = 0;
+    var framesPerPacket = 0;
     var packetCount = 0;
     var validFrames = 0;
     var primingFrames = 312;
@@ -401,6 +402,7 @@ class _CafOpusReader {
           final codec = ascii.decode(bytes.sublist(offset + 8, offset + 12));
           if (codec != 'opus') throw const FormatException('CAF is not Opus');
           bytesPerPacket = _data.getUint32(offset + 16, Endian.big);
+          framesPerPacket = _data.getUint32(offset + 20, Endian.big);
           channels = _data.getUint32(offset + 24, Endian.big);
         case 'data':
           if (size < 4) throw const FormatException('Invalid CAF audio data');
@@ -421,7 +423,7 @@ class _CafOpusReader {
     }
 
     final sizes = <int>[];
-    if (bytesPerPacket > 0) {
+    if (bytesPerPacket > 0 && framesPerPacket > 0) {
       sizes.addAll(List.filled(packetCount, bytesPerPacket));
     } else {
       final table = packetTable;
@@ -429,7 +431,7 @@ class _CafOpusReader {
         throw const FormatException('CAF packet table is missing');
       }
       var tableOffset = 0;
-      while (sizes.length < packetCount) {
+      int readPacketValue() {
         var value = 0;
         int byte;
         do {
@@ -439,7 +441,15 @@ class _CafOpusReader {
           byte = table[tableOffset++];
           value = (value << 7) | (byte & 0x7f);
         } while ((byte & 0x80) != 0);
-        sizes.add(value);
+        return value;
+      }
+
+      for (var index = 0; index < packetCount; index++) {
+        sizes.add(bytesPerPacket > 0 ? bytesPerPacket : readPacketValue());
+        // CAF stores a frame count after each size for variable-duration audio.
+        if (framesPerPacket == 0 && readPacketValue() <= 0) {
+          throw const FormatException('Invalid CAF packet frame count');
+        }
       }
     }
 

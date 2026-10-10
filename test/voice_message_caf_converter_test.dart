@@ -48,9 +48,24 @@ void main() {
     expect(table.getInt32(20), 120);
     expect(chunks['pakt']!.sublist(24), [
       0x82, 0x2c, // 300 bytes.
+      0x87, 0x40, // 960 frames.
       0x83, 0x10, // 400 bytes.
+      0x8f, 0x00, // 1920 frames.
     ]);
   });
+
+  test(
+    'round-trips CAF with mixed packet durations without losing audio',
+    () async {
+      final ogg = _ogg([_packet(0xf8, 300), _packet(0xf9, 400)]);
+      _setLastGranule(ogg, 2760);
+      final caf = convertOggOpusToCaf(ogg);
+      final restored = await normalizeVoiceMessageToOgg(caf);
+      final restoredCaf = convertOggOpusToCaf(restored);
+      expect(_cafChunks(restoredCaf)['data'], _cafChunks(caf)['data']);
+      expect(_cafChunks(restoredCaf)['pakt'], _cafChunks(caf)['pakt']);
+    },
+  );
 
   test('reassembles an Opus packet continued on the next OGG page', () {
     final packet = _packet(0xf8, 300);
