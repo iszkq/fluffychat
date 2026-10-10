@@ -18,7 +18,7 @@ final _imageBytes = base64Decode(
 );
 
 XFile _photo(String name) =>
-    XFile.fromData(_imageBytes, name: name, mimeType: 'image/png');
+    XFile.fromData(_imageBytes, name: name, path: name, mimeType: 'image/png');
 
 class _DelayedConfigClient implements Client {
   final config = Completer<MediaConfig>();
@@ -243,7 +243,12 @@ void main() {
     ]);
     room.client.compressedBytes = _imageBytes;
     await _openDialog(tester, room, [
-      XFile.fromData(original, name: 'large-photo.png', mimeType: 'image/png'),
+      XFile.fromData(
+        original,
+        name: 'large-photo.png',
+        path: 'large-photo.png',
+        mimeType: 'image/png',
+      ),
     ]);
     await tester.tap(find.text('Send'));
     await _dismissWhileConfigIsPending(tester);
