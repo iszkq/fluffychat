@@ -194,7 +194,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
         final fileName = 'voice_${DateTime.now().microsecondsSinceEpoch}';
         if (Platform.isIOS && audioFormat.isOgg) {
           Logs().v('Convert ogg audio file for iOS...');
-          final caf = await compute(convertOggOpusToCaf, matrixFile.bytes);
+          final caf = await compute(convertVoiceMessageToCaf, matrixFile.bytes);
           file = File('${tempDir.path}/$fileName.caf');
           await file.writeAsBytes(caf, flush: true);
         } else {
@@ -320,7 +320,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
       return (extension: 'flac', mimeType: 'audio/flac', isOgg: false);
     }
     if (startsWith(const [0x63, 0x61, 0x66, 0x66])) {
-      return (extension: 'caf', mimeType: 'audio/x-caf', isOgg: false);
+      return (extension: 'caf', mimeType: 'audio/x-caf', isOgg: true);
     }
     // ADTS AAC also starts with an MPEG-style 0xff sync byte, so it must be
     // detected before the broader MP3 frame check below.
@@ -332,7 +332,7 @@ class AudioPlayerState extends State<AudioPlayerWidget> {
       return (extension: 'mp3', mimeType: 'audio/mpeg', isOgg: false);
     }
     if (startsWith(const [0x1a, 0x45, 0xdf, 0xa3])) {
-      return (extension: 'webm', mimeType: 'audio/webm', isOgg: false);
+      return (extension: 'webm', mimeType: 'audio/webm', isOgg: true);
     }
     if (startsWith(const [0x23, 0x21, 0x41, 0x4d, 0x52])) {
       return (extension: 'amr', mimeType: 'audio/amr', isOgg: false);

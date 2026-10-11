@@ -4,6 +4,18 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:fluffychat/utils/voice_message_ogg_converter.dart';
+
+/// Converts any supported Opus container into the CAF variant accepted by iOS.
+/// Incoming Matrix voice messages can be OGG, WebM, or CAF depending on the
+/// sending client.
+Future<Uint8List> convertVoiceMessageToCaf(Uint8List bytes) async {
+  final ogg = _startsWithAscii(bytes, 'OggS')
+      ? bytes
+      : await normalizeVoiceMessageToOgg(bytes);
+  return convertOggOpusToCaf(ogg);
+}
+
 /// Repackages OGG/Opus for Apple's audio player without changing the audio.
 ///
 /// OGG's input rate is informational: granules and pre-skip always use 48 kHz.
@@ -121,6 +133,14 @@ Uint8List convertOggOpusToCaf(Uint8List bytes) {
   chunk('data', audio.takeBytes());
   chunk('pakt', table.takeBytes());
   return output.takeBytes();
+}
+
+bool _startsWithAscii(Uint8List bytes, String signature) {
+  if (bytes.length < signature.length) return false;
+  for (var index = 0; index < signature.length; index++) {
+    if (bytes[index] != signature.codeUnitAt(index)) return false;
+  }
+  return true;
 }
 
 bool _matches(Uint8List bytes, int offset, String signature) {
