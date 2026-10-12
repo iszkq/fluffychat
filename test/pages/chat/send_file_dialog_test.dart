@@ -205,6 +205,7 @@ void main() {
           ),
         ),
       );
+        await tester.pumpAndSettle();
       await tester.tap(find.text('Take photo'));
       portraitChat.value = false;
       await tester.pumpAndSettle();
