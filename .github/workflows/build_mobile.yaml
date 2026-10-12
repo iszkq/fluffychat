@@ -154,6 +154,8 @@ jobs:
           import os, pathlib, plistlib
           app = pathlib.Path('build/ios/iphoneos/Runner.app')
           info = plistlib.loads((app / 'Info.plist').read_bytes())
+          expected_build = str(300000 + int(os.environ['GITHUB_RUN_NUMBER']))
+          assert info['CFBundleVersion'] == expected_build, 'iOS build number was not applied'
           binary = (app / info['CFBundleExecutable']).read_bytes()
           assert b'im.fluffychat/ios_camera' in binary, 'Native camera missing from built app'
           pathlib.Path('ios-build-info.txt').write_text(
