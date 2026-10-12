@@ -25,8 +25,9 @@ Future<void> showCameraPhotoDialog({
   final l10n = L10n.of(context);
 
   try {
-    var photo = await capturePhoto();
-    if (photo == null || !navigator.mounted) return;
+    final capturedPhoto = await capturePhoto();
+    if (capturedPhoto == null || !navigator.mounted) return;
+    var photo = capturedPhoto;
 
     if (preparePhoto != null) {
       try {
