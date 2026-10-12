@@ -8,6 +8,7 @@ import 'dart:typed_data';
 
 import 'package:cross_file/cross_file.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/chat/camera_photo_dialog.dart';
 import 'package:fluffychat/pages/chat/send_file_dialog.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -158,6 +159,71 @@ Future<void> _dismissWhileConfigIsPending(WidgetTester tester) async {
 }
 
 void main() {
+  for (final normalizationFails in [false, true]) {
+    testWidgets('opens and sends camera photo after chat replacement '
+        '(normalization fails: $normalizationFails)', (tester) async {
+      final room = _TestRoom();
+      final captured = Completer<XFile?>();
+      final portraitChat = ValueNotifier(true);
+      addTearDown(portraitChat.dispose);
+      BuildContext? originalContext;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: [
+            ...L10n.localizationsDelegates,
+            ...GlobalMaterialLocalizations.delegates,
+          ],
+          supportedLocales: L10n.supportedLocales,
+          theme: ThemeData(platform: TargetPlatform.android),
+          home: Scaffold(
+            body: ValueListenableBuilder<bool>(
+              valueListenable: portraitChat,
+              builder: (context, portrait, _) => portrait
+                  ? Builder(
+                      builder: (context) {
+                        originalContext = context;
+                        return TextButton(
+                          onPressed: () => showCameraPhotoDialog(
+                            context: context,
+                            room: room,
+                            capturePhoto: () => captured.future,
+                            preparePhoto: normalizationFails
+                                ? (_) async => throw const FormatException(
+                                    'Unsupported camera image format',
+                                  )
+                                : null,
+                            threadRootEventId: '\$camera-thread',
+                          ),
+                          child: const Text('Take photo'),
+                        );
+                      },
+                    )
+                  : const Text('Landscape chat'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Take photo'));
+      portraitChat.value = false;
+      await tester.pumpAndSettle();
+      expect(originalContext!.mounted, isFalse);
+
+      captured.complete(_photo('landscape.png'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SendFileDialog), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
+
+      room.client.config.complete(MediaConfig(mUploadSize: 1000000));
+      await tester.tap(find.text('Send'));
+      await tester.pumpAndSettle();
+      expect(room.sentFiles.single.file.bytes, _imageBytes);
+      expect(room.sentFiles.single.threadRootEventId, '\$camera-thread');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('sends a photo and caption after the dialog has been disposed', (
     tester,
   ) async {

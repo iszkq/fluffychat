@@ -13,6 +13,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/pages/chat/camera_photo_dialog.dart';
 import 'package:fluffychat/pages/chat/chat_view.dart';
 import 'package:fluffychat/pages/chat/event_info_dialog.dart';
 import 'package:fluffychat/pages/chat/start_poll_bottom_sheet.dart';
@@ -857,42 +858,30 @@ class ChatController extends State<ChatPageWithRoom>
 
   Future<void> openCameraAction() async {
     inputFocus.unfocus();
-    var file = await ImagePicker().pickImage(source: ImageSource.camera);
-    if (file == null) return;
-    if (!mounted) return;
-
-    if (PlatformInfos.isIOS) {
-      final capturedFile = file;
-      final normalized = await showFutureLoadingDialog<Uint8List>(
-        context: context,
-        future: () async =>
-            compute(normalizeCameraImage, await capturedFile.readAsBytes()),
-      );
-      if (!mounted) return;
-      final bytes = normalized.result;
-      if (bytes == null) return;
-      final dot = capturedFile.name.lastIndexOf('.');
-      final baseName = dot > 0
-          ? capturedFile.name.substring(0, dot)
-          : capturedFile.name;
-      file = XFile.fromData(
-        bytes,
-        name: '$baseName.jpg',
-        mimeType: 'image/jpeg',
-        length: bytes.length,
-      );
-    }
-
-    final photo = file;
-    await showAdaptiveDialog(
+    await showCameraPhotoDialog(
       context: context,
-      builder: (c) => SendFileDialog(
-        files: [photo],
-        room: room,
-        outerContext: context,
-        threadRootEventId: activeThreadId,
-        threadLastEventId: threadLastEventId,
-      ),
+      room: room,
+      threadRootEventId: activeThreadId,
+      threadLastEventId: threadLastEventId,
+      capturePhoto: () => ImagePicker().pickImage(source: ImageSource.camera),
+      preparePhoto: PlatformInfos.isIOS
+          ? (file) async {
+              final bytes = await compute(
+                normalizeCameraImage,
+                await file.readAsBytes(),
+              );
+              final dot = file.name.lastIndexOf('.');
+              final baseName = dot > 0
+                  ? file.name.substring(0, dot)
+                  : file.name;
+              return XFile.fromData(
+                bytes,
+                name: '$baseName.jpg',
+                mimeType: 'image/jpeg',
+                length: bytes.length,
+              );
+            }
+          : null,
     );
   }
 
