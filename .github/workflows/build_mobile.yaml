@@ -49,6 +49,7 @@ jobs:
             test/pages/chat/read_marker_test.dart test/push_summary_test.dart \
             test/pages/chat/sticker_repository_test.dart \
             test/voice_message_caf_converter_test.dart \
+            test/normalize_camera_image_test.dart \
             test/android_background_notifications_mode_test.dart
 
       - name: Configure stable release signing

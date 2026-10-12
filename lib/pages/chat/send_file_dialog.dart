@@ -321,12 +321,6 @@ class SendFileDialogState extends State<SendFileDialog> {
                                       future: _files[i].readAsBytes(),
                                       builder: (context, snapshot) {
                                         final bytes = snapshot.data;
-                                        if (bytes == null) {
-                                          return const Center(
-                                            child:
-                                                CircularProgressIndicator.adaptive(),
-                                          );
-                                        }
                                         if (snapshot.error != null) {
                                           Logs().w(
                                             'Unable to preview image',
@@ -342,6 +336,12 @@ class SendFileDialogState extends State<SendFileDialog> {
                                                 size: 64,
                                               ),
                                             ),
+                                          );
+                                        }
+                                        if (bytes == null) {
+                                          return const Center(
+                                            child:
+                                                CircularProgressIndicator.adaptive(),
                                           );
                                         }
                                         return Image.memory(

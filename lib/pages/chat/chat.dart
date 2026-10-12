@@ -26,6 +26,7 @@ import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call.dart
 import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/filtered_timeline_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
+import 'package:fluffychat/utils/normalize_camera_image.dart';
 import 'package:fluffychat/utils/object_url.dart';
 import 'package:fluffychat/utils/other_party_can_receive.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
@@ -856,14 +857,37 @@ class ChatController extends State<ChatPageWithRoom>
 
   Future<void> openCameraAction() async {
     inputFocus.unfocus();
-    final file = await ImagePicker().pickImage(source: ImageSource.camera);
+    var file = await ImagePicker().pickImage(source: ImageSource.camera);
     if (file == null) return;
     if (!mounted) return;
 
+    if (PlatformInfos.isIOS) {
+      final capturedFile = file;
+      final normalized = await showFutureLoadingDialog<Uint8List>(
+        context: context,
+        future: () async =>
+            compute(normalizeCameraImage, await capturedFile.readAsBytes()),
+      );
+      if (!mounted) return;
+      final bytes = normalized.result;
+      if (bytes == null) return;
+      final dot = capturedFile.name.lastIndexOf('.');
+      final baseName = dot > 0
+          ? capturedFile.name.substring(0, dot)
+          : capturedFile.name;
+      file = XFile.fromData(
+        bytes,
+        name: '$baseName.jpg',
+        mimeType: 'image/jpeg',
+        length: bytes.length,
+      );
+    }
+
+    final photo = file;
     await showAdaptiveDialog(
       context: context,
       builder: (c) => SendFileDialog(
-        files: [file],
+        files: [photo],
         room: room,
         outerContext: context,
         threadRootEventId: activeThreadId,
