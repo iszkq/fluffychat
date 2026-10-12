@@ -23,11 +23,11 @@ import 'package:fluffychat/pages/chat_details/chat_details.dart';
 import 'package:fluffychat/utils/adaptive_bottom_sheet.dart';
 import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/file_selector.dart';
+import 'package:fluffychat/utils/ios_camera.dart';
 import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/filtered_timeline_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
-import 'package:fluffychat/utils/normalize_camera_image.dart';
 import 'package:fluffychat/utils/object_url.dart';
 import 'package:fluffychat/utils/other_party_can_receive.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
@@ -863,25 +863,11 @@ class ChatController extends State<ChatPageWithRoom>
       room: room,
       threadRootEventId: activeThreadId,
       threadLastEventId: threadLastEventId,
-      capturePhoto: () => ImagePicker().pickImage(source: ImageSource.camera),
-      preparePhoto: PlatformInfos.isIOS
-          ? (file) async {
-              final bytes = await compute(
-                normalizeCameraImage,
-                await file.readAsBytes(),
-              );
-              final dot = file.name.lastIndexOf('.');
-              final baseName = dot > 0
-                  ? file.name.substring(0, dot)
-                  : file.name;
-              return XFile.fromData(
-                bytes,
-                name: '$baseName.jpg',
-                mimeType: 'image/jpeg',
-                length: bytes.length,
-              );
-            }
-          : null,
+      capturePhoto: PlatformInfos.isIOS
+          ? () => IosCamera.capturePhoto(
+              Localizations.localeOf(context).toLanguageTag(),
+            )
+          : () => ImagePicker().pickImage(source: ImageSource.camera),
     );
   }
 

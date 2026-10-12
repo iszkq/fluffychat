@@ -12,6 +12,9 @@ import Flutter
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "FluffyCameraPlugin") {
+      FluffyCameraPlugin.register(with: registrar)
+    }
     
     // From https://pub.dev/packages/flutter_local_notifications#-ios-setup
     UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate  }

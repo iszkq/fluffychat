@@ -50,6 +50,7 @@ jobs:
             test/pages/chat/sticker_repository_test.dart \
             test/voice_message_caf_converter_test.dart \
             test/normalize_camera_image_test.dart \
+            test/ios_camera_test.dart \
             test/android_background_notifications_mode_test.dart
 
       - name: Configure stable release signing
@@ -116,6 +117,9 @@ jobs:
       - name: Install native dependencies
         run: brew install sqlcipher
 
+      - name: Test native camera orientation and Chinese controls
+        run: bash scripts/test-ios-camera.sh
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
@@ -125,6 +129,9 @@ jobs:
 
       - name: Validate iOS project
         run: plutil -lint ios/Runner.xcodeproj/project.pbxproj ios/Runner/Info.plist
+
+      - name: Verify camera bridge and preview regressions
+        run: flutter test --timeout 2m test/ios_camera_test.dart test/pages/chat/send_file_dialog_test.dart
 
       - name: Build iOS app without signing
         env:
@@ -140,6 +147,23 @@ jobs:
           --dart-define="VOICE_TRANSCRIPTION_ENDPOINT=${VOICE_TRANSCRIPTION_ENDPOINT}"
           --dart-define="OFFICE_EDITOR_URL=${OFFICE_EDITOR_URL}"
           --dart-define="PUSH_NOTIFICATIONS_GATEWAY_URL=${PUSH_NOTIFICATIONS_GATEWAY_URL}"
+
+      - name: Verify packaged camera and record build identity
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, plistlib
+          app = pathlib.Path('build/ios/iphoneos/Runner.app')
+          info = plistlib.loads((app / 'Info.plist').read_bytes())
+          binary = (app / info['CFBundleExecutable']).read_bytes()
+          assert b'im.fluffychat/ios_camera' in binary, 'Native camera missing from built app'
+          pathlib.Path('ios-build-info.txt').write_text(
+              f"Commit: {os.environ['GITHUB_SHA']}\n"
+              f"Version: {info['CFBundleShortVersionString']}\n"
+              f"Build: {info['CFBundleVersion']}\n"
+              "Camera: AVFoundation with app-localized review controls\n"
+          )
+          print(pathlib.Path('ios-build-info.txt').read_text())
+          PY
 
       - name: Package unsigned IPA
         run: |
@@ -172,12 +196,16 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: fluffychat-ios-unsigned
-          path: fluffychat-ios-unsigned.ipa
+          path: |
+            fluffychat-ios-unsigned.ipa
+            ios-build-info.txt
           retention-days: 14
 
       - name: Upload SideStore package
         uses: actions/upload-artifact@v7
         with:
           name: fluffychat-ios-sideload
-          path: fluffychat-ios-sideload.ipa
+          path: |
+            fluffychat-ios-sideload.ipa
+            ios-build-info.txt
           retention-days: 14
