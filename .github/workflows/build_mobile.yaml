@@ -130,8 +130,12 @@ jobs:
       - name: Validate iOS project
         run: plutil -lint ios/Runner.xcodeproj/project.pbxproj ios/Runner/Info.plist
 
-      - name: Verify camera bridge and preview regressions
-        run: flutter test --timeout 2m test/ios_camera_test.dart test/pages/chat/send_file_dialog_test.dart
+      - name: Verify camera and voice playback regressions
+        run: >-
+          flutter test --timeout 2m
+          test/ios_camera_test.dart
+          test/pages/chat/send_file_dialog_test.dart
+          test/voice_message_caf_converter_test.dart
 
       - name: Build iOS app without signing
         env:

@@ -26,6 +26,7 @@ Uint8List convertOggOpusToCaf(Uint8List bytes) {
   int? serial;
   var sequence = 0;
   int? finalGranule;
+  int? lastPageGranule;
   var offset = 0;
   while (offset < bytes.length) {
     if (offset + 27 > bytes.length ||
@@ -62,12 +63,11 @@ Uint8List convertOggOpusToCaf(Uint8List bytes) {
         pending = BytesBuilder(copy: false);
       }
     }
-    if ((flags & 4) != 0) {
-      finalGranule = data.getInt64(6, Endian.little);
-    }
+    lastPageGranule = data.getInt64(6, Endian.little);
+    if ((flags & 4) != 0) finalGranule = lastPageGranule;
     offset = bodyOffset;
   }
-  if (pending.length != 0 || finalGranule == null || packets.length < 3) {
+  if (pending.length != 0 || packets.length < 3) {
     throw const FormatException('Incomplete OGG/Opus stream');
   }
   final head = packets[0];
@@ -88,9 +88,17 @@ Uint8List convertOggOpusToCaf(Uint8List bytes) {
   final audioPackets = packets.sublist(2);
   final frameCounts = audioPackets.map(_packetSamples).toList();
   final totalFrames = frameCounts.fold<int>(0, (sum, count) => sum + count);
+  // Some clients omit the end-of-stream flag even though all pages and
+  // packets are complete. Preserve the last page's timing when available;
+  // otherwise use the decoded packet durations. Never accept a partial packet.
+  final granule =
+      finalGranule ??
+      (lastPageGranule != null && lastPageGranule >= 0
+          ? lastPageGranule
+          : totalFrames);
   // Some older senders add pre-skip to the final granule. Clamp that value to
   // the available decoded samples instead of writing an impossible CAF table.
-  final endFrame = finalGranule.clamp(0, totalFrames);
+  final endFrame = granule.clamp(0, totalFrames);
   if (endFrame <= preSkip) {
     throw const FormatException('OGG contains no playable Opus frames');
   }

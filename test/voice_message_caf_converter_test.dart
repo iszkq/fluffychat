@@ -102,8 +102,51 @@ void main() {
       () => convertOggOpusToCaf(ogg.sublist(0, ogg.length - 1)),
       throwsFormatException,
     );
-    ogg[_pageOffsets(ogg).last + 5] = 0; // Missing end-of-stream marker.
-    expect(() => convertOggOpusToCaf(ogg), throwsFormatException);
+  });
+
+  test('accepts complete OGG without an end-of-stream flag and keeps trim', () {
+    final packets = [_packet(0xf8, 300), _packet(0xf9, 400)];
+    final ogg = _ogg(packets);
+    _setLastGranule(ogg, 2760);
+    final expected = _cafChunks(convertOggOpusToCaf(ogg));
+    ogg[_pageOffsets(ogg).last + 5] = 0;
+
+    final actual = _cafChunks(convertOggOpusToCaf(ogg));
+    expect(actual['data'], expected['data']);
+    expect(actual['pakt'], expected['pakt']);
+  });
+
+  test('uses packet durations when OGG has no end flag or final timing', () {
+    final ogg = _ogg([_packet(0xf8, 300), _packet(0xf9, 400)]);
+    ogg[_pageOffsets(ogg).last + 5] = 0;
+    _setLastGranule(ogg, -1);
+
+    final chunks = _cafChunks(convertOggOpusToCaf(ogg));
+    final table = ByteData.sublistView(chunks['pakt']!);
+    expect(table.getInt64(0), 2);
+    expect(table.getInt64(8), 2568);
+    expect(table.getInt32(16), 312);
+    expect(table.getInt32(20), 0);
+  });
+
+  test('rejects an unfinished packet even without an end-of-stream flag', () {
+    final ogg = _ogg([_packet(0xf8, 255)]);
+    final last = _pageOffsets(ogg).last;
+    // Remove the zero-sized terminating segment but keep a complete OGG page.
+    final unfinished = Uint8List.fromList([
+      ...ogg.sublist(0, last + 28),
+      ...ogg.sublist(last + 29),
+    ]);
+    unfinished[last + 5] = 0;
+    unfinished[last + 26] = 1;
+    _setLastGranule(unfinished, -1);
+    expect(() => convertOggOpusToCaf(unfinished), throwsFormatException);
+  });
+
+  test('rejects OGG headers without any audio packets', () {
+    final ogg = _ogg([_packet(0xf8, 20)]);
+    final headers = ogg.sublist(0, _pageOffsets(ogg)[2]);
+    expect(() => convertOggOpusToCaf(headers), throwsFormatException);
   });
 
   test('OGG page granules do not count pre-skip twice', () {
