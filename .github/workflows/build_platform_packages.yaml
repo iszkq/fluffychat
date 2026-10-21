@@ -108,9 +108,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: flutter pub get
       - name: Build unsigned macOS app
-        run: flutter build macos --release
+        run: flutter build macos --release -v 2>&1 | tee macos-build.log
         env:
           CODE_SIGNING_ALLOWED: NO
+      - name: Upload macOS diagnostic log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fluffychat-macos-build-log
+          path: macos-build.log
+          retention-days: 7
       - run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/FluffyChat.app fluffychat-macos.zip
       - uses: actions/upload-artifact@v7
         with:
