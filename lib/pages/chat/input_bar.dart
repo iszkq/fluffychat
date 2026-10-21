@@ -57,8 +57,9 @@ class InputBar extends StatelessWidget {
 
   List<Map<String, String?>> getSuggestions(TextEditingValue text) {
     if (text.selection.baseOffset != text.selection.extentOffset ||
-        text.selection.baseOffset < 0) {
-      return []; // no entries if there is selected text
+        text.selection.baseOffset < 0 ||
+        (text.composing.isValid && !text.composing.isCollapsed)) {
+      return []; // Wait for a collapsed cursor and committed IME text.
     }
     final searchText = text.text.substring(0, text.selection.baseOffset);
     final ret = <Map<String, String?>>[];
@@ -157,24 +158,50 @@ class InputBar extends StatelessWidget {
         }
       }
     }
-    final userMatch = RegExp(r'(?:\s|^)@([-\w]+)$').firstMatch(searchText);
+    // Allow Chinese and other Unicode names; @ by itself opens the member list.
+    final userMatch = RegExp(r'@([^\s@]*)$').firstMatch(searchText);
     if (userMatch != null) {
       final userSearch = userMatch[1]!.toLowerCase();
-      for (final user in room.getParticipants()) {
-        if ((user.displayName != null &&
-                (user.displayName!.toLowerCase().contains(userSearch) ||
-                    slugify(
-                      user.displayName!.toLowerCase(),
-                    ).contains(userSearch))) ||
-            user.id.localpart!.toLowerCase().contains(userSearch)) {
-          ret.add({
-            'type': 'user',
-            'mxid': user.id,
-            'mention': user.mention,
-            'displayname': user.displayName,
-            'avatar_url': user.avatarUrl?.toString(),
-          });
+      const roomMentionAliases = ['room', 'all', 'everyone', '全体', '所有人'];
+      final userId = room.client.userID;
+      final canMentionRoom =
+          userId != null && room.canSendNotification(userId);
+      if (canMentionRoom &&
+          (userSearch.isEmpty ||
+              roomMentionAliases.any((alias) => alias.contains(userSearch)))) {
+        ret.add({'type': 'room_mention'});
+      }
+      final participants = room.getParticipants().where((user) {
+        final displayName = user.displayName?.toLowerCase() ?? '';
+        final localpart = user.id.localpart?.toLowerCase() ?? '';
+        final mxid = user.id.toString().toLowerCase();
+        return displayName.contains(userSearch) ||
+            slugify(displayName).contains(userSearch) ||
+            localpart.contains(userSearch) ||
+            mxid.contains(userSearch);
+      }).toList();
+      participants.sort((a, b) {
+        int score(User user) {
+          final displayName = user.displayName?.toLowerCase() ?? '';
+          final localpart = user.id.localpart?.toLowerCase() ?? '';
+          if (displayName == userSearch || localpart == userSearch) return 0;
+          if (displayName.startsWith(userSearch) ||
+              localpart.startsWith(userSearch)) {
+            return 1;
+          }
+          return 2;
         }
+
+        return score(a).compareTo(score(b));
+      });
+      for (final user in participants) {
+        ret.add({
+          'type': 'user',
+          'mxid': user.id,
+          'mention': user.mention,
+          'displayname': user.displayName,
+          'avatar_url': user.avatarUrl?.toString(),
+        });
         if (ret.length > maxResults) {
           break;
         }
@@ -318,6 +345,17 @@ class InputBar extends StatelessWidget {
         title: Text(suggestion['displayname'] ?? suggestion['mxid']!),
       );
     }
+    if (suggestion['type'] == 'room_mention') {
+      return ListTile(
+        onTap: () => onSelected(suggestion),
+        leading: const SizedBox.square(
+          dimension: size,
+          child: Icon(Icons.groups_outlined),
+        ),
+        title: const Text('@room'),
+        subtitle: Text(L10n.of(context).sendRoomNotifications),
+      );
+    }
     return const SizedBox.shrink();
   }
 
@@ -327,9 +365,9 @@ class InputBar extends StatelessWidget {
       controller!.selection.baseOffset,
     );
     var startText = '';
-    final afterText = replaceText == controller!.text
-        ? ''
-        : controller!.text.substring(controller!.selection.baseOffset + 1);
+    final afterText = controller!.text.substring(
+      controller!.selection.baseOffset,
+    );
     var insertText = '';
     if (suggestion['type'] == 'command') {
       insertText = '${suggestion['name']!} ';
@@ -373,15 +411,22 @@ class InputBar extends StatelessWidget {
     if (suggestion['type'] == 'user') {
       insertText = '${suggestion['mention']!} ';
       startText = replaceText.replaceAllMapped(
-        RegExp(r'(\s|^)(@[-\w]+)$'),
-        (Match m) => '${m[1]}$insertText',
+        RegExp(r'@([^\s@]*)$'),
+        (_) => insertText,
+      );
+    }
+    if (suggestion['type'] == 'room_mention') {
+      insertText = '@room ';
+      startText = replaceText.replaceAllMapped(
+        RegExp(r'@([^\s@]*)$'),
+        (_) => insertText,
       );
     }
     if (suggestion['type'] == 'room') {
       insertText = '${suggestion['mxid']!} ';
       startText = replaceText.replaceAllMapped(
-        RegExp(r'(\s|^)(#[-\w]+)$'),
-        (Match m) => '${m[1]}$insertText',
+        RegExp(r'#([^\s#]*)$'),
+        (_) => insertText,
       );
     }
 
