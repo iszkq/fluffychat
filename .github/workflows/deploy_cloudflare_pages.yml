@@ -65,7 +65,7 @@ jobs:
           ./scripts/prepare-web.sh
 
       - name: Verify web voice encoding
-        run: flutter test --platform chrome --timeout 2m test/voice_message_ogg_encoder_web_test.dart
+        run: bash scripts/test-web-voice.sh
 
       - name: Build Flutter Web
         run: |

@@ -10,10 +10,25 @@ import 'dart:typed_data';
 
 import 'package:fluffychat/utils/voice_message_ogg_converter.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   test('encodes browser PCM WAV as OGG Opus', () async {
-    final ogg = await normalizeVoiceMessageToOgg(_createTestWav());
+    for (final asset in ['libopus.js', 'libopus.wasm']) {
+      final response = await http
+          .get(Uri.base.resolve('assets/packages/opus_codec_web/assets/$asset'))
+          .timeout(const Duration(seconds: 10));
+      expect(
+        response.statusCode,
+        200,
+        reason:
+            'Missing $asset. Run browser tests with scripts/test-web-voice.sh',
+      );
+      expect(response.bodyBytes, isNotEmpty);
+    }
+    final ogg = await normalizeVoiceMessageToOgg(
+      _createTestWav(),
+    ).timeout(const Duration(seconds: 20));
 
     expect(ascii.decode(ogg.sublist(0, 4)), 'OggS');
     expect(_containsAscii(ogg, 'OpusHead'), isTrue);
