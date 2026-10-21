@@ -67,6 +67,7 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v7
+      - uses: ilammy/setup-nasm@v1
       - uses: subosito/flutter-action@v2
         with:
           flutter-version-file: .tool_versions.yaml
@@ -97,7 +98,7 @@ jobs:
 
   macos:
     name: macOS app
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
