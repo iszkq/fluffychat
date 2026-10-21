@@ -32,6 +32,8 @@ jobs:
           flutter-version-file: .tool_versions.yaml
           cache: true
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install native test dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build
       - run: flutter pub get --enforce-lockfile
       - name: Check version and release notes
         shell: bash
@@ -41,6 +43,14 @@ jobs:
           test -f "docs/releases/${RELEASE_TAG}.md"
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings lib
       - run: flutter test --timeout 2m test/update_notifier_test.dart
+      - name: Build encryption library for transport regression tests
+        shell: bash
+        run: |
+          crypto_root="$(python3 -c 'import json, pathlib, urllib.parse; p=next(p for p in json.load(open(".dart_tool/package_config.json"))["packages"] if p["name"]=="flutter_vodozemac"); print(pathlib.Path(urllib.parse.unquote(urllib.parse.urlparse(p["rootUri"]).path))/"rust")')"
+          cargo build --release --manifest-path "$crypto_root/Cargo.toml" --target-dir "$RUNNER_TEMP/mention-crypto"
+          echo "MENTION_TEST_VODOZEMAC_DIR=$RUNNER_TEMP/mention-crypto/release/" >> "$GITHUB_ENV"
+      - name: Verify mentions, encrypted transport, permissions and rendering
+        run: flutter test --no-pub --reporter expanded test/room_mention_test.dart test/room_mention_delivery_test.dart test/room_mention_rendering_test.dart
 
   android:
     name: Android APK and AAB

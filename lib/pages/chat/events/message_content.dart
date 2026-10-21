@@ -182,6 +182,7 @@ class MessageContent extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: HtmlMessage(
                 html: html,
+                roomMention: event.mentions.room,
                 textColor: textColor,
                 room: event.room,
                 fontSize: AppConfig.messageFontSize * (bigEmotes ? 5 : 1),

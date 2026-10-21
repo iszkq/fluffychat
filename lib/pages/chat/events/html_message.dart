@@ -24,6 +24,7 @@ import '../../../utils/url_launcher.dart';
 
 class HtmlMessage extends StatelessWidget {
   final String html;
+  final bool roomMention;
   final Room room;
   final Color textColor;
   final double fontSize;
@@ -35,6 +36,7 @@ class HtmlMessage extends StatelessWidget {
   const HtmlMessage({
     super.key,
     required this.html,
+    this.roomMention = false,
     required this.room,
     required this.fontSize,
     required this.linkStyle,
@@ -172,6 +174,86 @@ class HtmlMessage extends StatelessWidget {
       // Single linebreak nodes between Elements are ignored:
       if (text == '\n') text = '';
 
+      var isQuotedOrCode = false;
+      for (var parent = node.parent; parent != null; parent = parent.parent) {
+        if ({
+          'a',
+          'code',
+          'pre',
+          'blockquote',
+          'mx-reply',
+        }.contains(parent.localName)) {
+          isQuotedOrCode = true;
+          break;
+        }
+      }
+      if (roomMention && !isQuotedOrCode) {
+        final matches = RegExp(
+          r'(?<![A-Za-z0-9_@])@room(?![A-Za-z0-9_:/+-]|\.[A-Za-z0-9])',
+        ).allMatches(text);
+        if (matches.isNotEmpty) {
+          final spans = <InlineSpan>[];
+          var start = 0;
+          for (final match in matches) {
+            spans.add(
+              LinkifySpan(
+                text: text.substring(start, match.start),
+                options: const LinkifyOptions(humanize: false),
+                linkStyle: linkStyle,
+                onOpen: onOpen,
+              ),
+            );
+            spans.add(
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Tooltip(
+                  message: L10n.of(context).sendRoomNotifications,
+                  child: Container(
+                    key: const ValueKey('room_mention_pill'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: (linkStyle.color ?? textColor).withAlpha(25),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.groups_outlined,
+                          size: fontSize,
+                          color: linkStyle.color ?? textColor,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          L10n.of(context).mentionEveryone,
+                          style: TextStyle(
+                            color: linkStyle.color ?? textColor,
+                            fontSize: fontSize,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+            start = match.end;
+          }
+          spans.add(
+            LinkifySpan(
+              text: text.substring(start),
+              options: const LinkifyOptions(humanize: false),
+              linkStyle: linkStyle,
+              onOpen: onOpen,
+            ),
+          );
+          return TextSpan(children: spans);
+        }
+      }
       return LinkifySpan(
         text: text,
         options: const LinkifyOptions(humanize: false),
@@ -205,6 +287,11 @@ class HtmlMessage extends StatelessWidget {
             );
           }
           if (matrixId.sigil == '#' || matrixId.sigil == '!') {
+            if (roomMention &&
+                matrixId == this.room.id &&
+                node.text.trim() == '@room') {
+              return _renderHtml(dom.Text('@room'), context, depth: depth);
+            }
             final room = matrixId.sigil == '!'
                 ? this.room.client.getRoomById(matrixId)
                 : this.room.client.getRoomByAlias(matrixId);

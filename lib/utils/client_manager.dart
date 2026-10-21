@@ -12,6 +12,7 @@ import 'package:fluffychat/utils/custom_image_resizer.dart';
 import 'package:fluffychat/utils/init_with_restore.dart';
 import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call_member.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
+import 'package:fluffychat/utils/room_mention_state.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_vodozemac/flutter_vodozemac.dart' as vod;
@@ -117,7 +118,7 @@ abstract class ClientManager {
     final shareKeysWith = AppSettings.shareKeysWith.value;
     final enableSoftLogout = AppSettings.enableSoftLogout.value;
 
-    return Client(
+    final client = Client(
       clientName,
       httpClient: CustomHttpClient.createHTTPClient(),
       verificationMethods: {
@@ -126,6 +127,9 @@ abstract class ClientManager {
           KeyVerificationMethod.emoji,
       },
       importantStateEvents: <String>{
+        // Room-mention push rules check the sender's notification permission
+        // before the room is opened or fully loaded (including background push).
+        EventTypes.RoomPowerLevels,
         // To make room emotes work
         'im.ponies.room_emotes',
         // To display call state in chat list
@@ -153,6 +157,16 @@ abstract class ClientManager {
         seconds: AppSettings.sendTimelineEventTimeout.value,
       ),
     );
+    final mentionStateKey = 'room_mention_power_levels_v1.$clientName';
+    if (store.getBool(mentionStateKey) != true) {
+      try {
+        await migrateRoomMentionPowerLevels(client);
+        await store.setBool(mentionStateKey, true);
+      } catch (e, s) {
+        Logs().w('Unable to preload room mention permissions', e, s);
+      }
+    }
+    return client;
   }
 
   static Future<void> sendInitNotification(String title, String body) async {
