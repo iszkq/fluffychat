@@ -2198,7 +2198,7 @@
     "changeGeneralChatSettings": "更改常规聊天设置",
     "chatPermissionsDescription": "定义此聊天中哪个权限等级对特定操作是必需的。权限等级 0、50 和 100 通常代表用户、主持人和管理员，但你可以自定义任何等级。",
     "changelog": "更新记录",
-    "updateInstalled": "🎉 已安装更新 {version} ！",
+    "updateInstalled": "已更新至 {version}",
     "@updateInstalled": {
         "type": "String",
         "placeholders": {
@@ -2512,7 +2512,6 @@
         "placeholders": {}
     },
     "hideRoomsInSpaces": "隐藏位于空间中的聊天室",
-    "possibleByYou": "没有您的支持不会有这个版本。FluffyChat 依旧免费、开源、完全由社区驱动。",
     "showThumbnailsInTimeline": "显示图片和视频的缩略图",
     "appSubtitle": "安全的 [matrix] 通信",
     "appDescription": "以对所有人简单易得的方式通过去中心化 [matrix] 网络加密通信。",
@@ -2887,5 +2886,6 @@
                 "type": "String"
             }
         }
-    }
+    },
+    "updateInstalledDescription": "当前使用 iszkq/fluffychat 定制版。更新记录中可查看本分支的改进和已知问题。"
 }

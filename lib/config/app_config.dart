@@ -33,20 +33,16 @@ abstract class AppConfig {
   static const String appOpenUrlScheme = 'im.fluffychat';
   static const String appSsoUrlScheme = 'im.fluffychat.auth';
 
-  static const String sourceCodeUrl =
-      'https://github.com/krille-chan/fluffychat';
-  static const String supportUrl =
-      'https://github.com/krille-chan/fluffychat/issues';
-  static const String changelogUrl = 'https://fluffychat.im/changelog/';
-  static const String helpUrl =
-      'https://ko-fi.com/post/How-can-I-support-FluffyChat-J2G325WE6I';
+  static const String sourceCodeUrl = 'https://github.com/iszkq/fluffychat';
+  static const String supportUrl = '$sourceCodeUrl/issues';
+  static const String changelogUrl = '$sourceCodeUrl/releases';
 
   static const Set<String> defaultReactions = {'👍', '❤️', '😂', '😮', '😢'};
 
   static final Uri newIssueUrl = Uri(
     scheme: 'https',
     host: 'github.com',
-    path: '/krille-chan/fluffychat/issues/new',
+    path: '/iszkq/fluffychat/issues/new',
   );
 
   static final Uri homeserverList = Uri(

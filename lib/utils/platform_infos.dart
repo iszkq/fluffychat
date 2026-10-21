@@ -51,22 +51,31 @@ abstract class PlatformInfos {
   static String get appDisplayName =>
       '${AppSettings.applicationName.value} ${isWeb ? 'web' : Platform.operatingSystem}${kReleaseMode ? '' : 'Debug'}';
 
-  static Future<String> getVersion() async {
+  static Future<String> getVersion({bool includeBuildNumber = false}) async {
     var version = kIsWeb ? 'Web' : 'Unknown';
     try {
-      version = (await PackageInfo.fromPlatform()).version;
+      final info = await PackageInfo.fromPlatform();
+      version = info.version;
+      if (includeBuildNumber && info.buildNumber.isNotEmpty) {
+        version = '$version+${info.buildNumber}';
+      }
     } catch (_) {}
     return version;
   }
 
   static Future<void> showDialog(BuildContext context) async {
     final l10n = L10n.of(context);
-    final version = await PlatformInfos.getVersion();
+    final version = await PlatformInfos.getVersion(includeBuildNumber: true);
     if (!context.mounted) return;
     showAboutDialog(
       context: context,
       children: [
         Text(l10n.versionWithNumber(version)),
+        TextButton.icon(
+          onPressed: () => launchUrlString(AppConfig.changelogUrl),
+          icon: const Icon(Icons.history_outlined),
+          label: Text(l10n.changelog),
+        ),
         TextButton.icon(
           onPressed: () => launchUrlString(AppConfig.sourceCodeUrl),
           icon: const Icon(Icons.source_outlined),

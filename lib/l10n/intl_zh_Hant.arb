@@ -2204,7 +2204,7 @@
     "loginWithMatrixId": "以Matrix-ID登入",
     "inviteOtherUsers": "邀請其他用戶進入本聊天",
     "sendRoomNotifications": "傳送一條 @room 群提醒",
-    "updateInstalled": "🎉已成功安裝{version}版本!",
+    "updateInstalled": "已更新至 {version}",
     "@updateInstalled": {
         "type": "String",
         "placeholders": {
@@ -2424,5 +2424,6 @@
                 "type": "String"
             }
         }
-    }
+    },
+    "updateInstalledDescription": "目前使用 iszkq/fluffychat 自訂版。更新記錄中可查看此分支的改進和已知問題。"
 }

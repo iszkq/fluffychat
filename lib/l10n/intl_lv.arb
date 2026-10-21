@@ -2493,7 +2493,6 @@
         "type": "String",
         "placeholders": {}
     },
-    "possibleByYou": "Šis laidiens bija iespējams pateicoties Tavam atbalstam. FluffyChat joprojām ir brīva, atvērta pirmkoda un pilnībā kopienas virzīta.",
     "hideRoomsInSpaces": "Paslēpt istabas, kas ir vietā",
     "showThumbnailsInTimeline": "Rādīt attēlu un video sīktēlus",
     "appSubtitle": "Droša [matrix] saziņa",

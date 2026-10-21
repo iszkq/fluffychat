@@ -2297,7 +2297,7 @@
     "sendRoomNotifications": "Send a @room notifications",
     "changeTheDescriptionOfTheGroup": "Change the description of the chat",
     "chatPermissionsDescription": "Define which power level is necessary for certain actions in this chat. The power levels 0, 50 and 100 are usually representing users, moderators and admins, but any gradation is possible.",
-    "updateInstalled": "🎉 Update {version} installed!",
+    "updateInstalled": "Updated to {version}",
     "@updateInstalled": {
         "type": "String",
         "placeholders": {
@@ -2568,7 +2568,6 @@
     "tagName": "Tag name",
     "createNewTag": "Create new tag",
     "hideRoomsInSpaces": "Hide rooms that are in a space",
-    "possibleByYou": "This release was only possible thanks to your support. FluffyChat remains free, open-source, and entirely community-driven.",
     "showThumbnailsInTimeline": "Show thumbnails of images and videos",
     "appSubtitle": "Secure [matrix] Communication",
     "appDescription": "Communicate encrypted over the decentralized [matrix] network in an easy and accessible way for everyone.",
@@ -2876,5 +2875,6 @@
                 "type": "String"
             }
         }
-    }
+    },
+    "updateInstalledDescription": "This is the iszkq/fluffychat edition. View our release notes for changes and known issues."
 }

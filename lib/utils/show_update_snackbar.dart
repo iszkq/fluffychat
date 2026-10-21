@@ -16,7 +16,9 @@ abstract class UpdateNotifier {
 
   static Future<void> showUpdateDialog(BuildContext context) async {
     final l10n = L10n.of(context);
-    final currentVersion = await PlatformInfos.getVersion();
+    final currentVersion = await PlatformInfos.getVersion(
+      includeBuildNumber: true,
+    );
     final store = await SharedPreferences.getInstance();
     final storedVersion = store.getString(versionStoreKey);
     if (!context.mounted) return;
@@ -31,28 +33,8 @@ abstract class UpdateNotifier {
               l10n.updateInstalled(currentVersion),
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            content: Text(l10n.possibleByYou),
+            content: Text(l10n.updateInstalledDescription),
             actions: [
-              AdaptiveDialogAction(
-                bigButtons: true,
-                onPressed: () => launchUrlString(AppConfig.helpUrl),
-                child: Row(
-                  mainAxisSize: .min,
-                  spacing: 4,
-                  children: [
-                    Icon(
-                      Icons.favorite,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    Text(
-                      l10n.support,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               AdaptiveDialogAction(
                 bigButtons: true,
                 onPressed: () => launchUrlString(AppConfig.changelogUrl),

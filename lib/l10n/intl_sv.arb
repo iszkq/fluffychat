@@ -2494,7 +2494,6 @@
     "tagName": "Taggnamn",
     "createNewTag": "Skapa ny tagg",
     "hideRoomsInSpaces": "Dölj rum som är i en plats",
-    "possibleByYou": "Denna utgåva var endast möjlig tack vare ditt stöd. FluffyChat behålls gratis, öppen källkod, och helt gemenskapsdriven.",
     "showThumbnailsInTimeline": "Visa förhandsvisning av bilder och videor",
     "appSubtitle": "Säker [matrix]-kommunikation",
     "appDescription": "Kommunicera krypterat över det decentraliserade [matrix]-nätverket på ett enkelt och tillgängligt sätt för alla.",

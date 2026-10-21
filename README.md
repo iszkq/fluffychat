@@ -155,7 +155,7 @@ sudo apt install libjsoncpp1 libsecret-1-dev libsecret-1-0 \
 
 - Android/macOS 在编码器支持时发送 OGG/Opus。
 - iOS 因录音库的 Opus 兼容问题，保留 AAC-LC/M4A 回退。
-- Web 录音目前仍由原项目禁用。
+- Web 录音通过 PCM/WAV 转 OGG/Opus，已加入浏览器编码回归。
 - 接收端会修正错误的 MIME 和扩展名，但最终解码能力仍取决于操作系统或浏览器。
 - AIHubMix 文档没有明确列出 OGG；当前代理会原样上传。如果供应商拒绝 OGG，
   需要在支持 FFmpeg 的后端增加转码，不能在普通 Cloudflare Pages 静态环境完成。
@@ -165,7 +165,9 @@ sudo apt install libjsoncpp1 libsecret-1-dev libsecret-1-0 \
 - [Cloudflare Pages 部署说明](docs/cloudflare-pages-zh.md)
 - [隐私说明](PRIVACY.md)
 - [安全说明](SECURITY.md)
-- `CHANGELOG.md` 为 FluffyChat 上游历史记录，保留原文以便追溯。
+- [本分支更新记录](https://github.com/iszkq/fluffychat/releases)
+- [300036 真机测试与后续建议](docs/testing-and-roadmap-2026-10-21.md)
+- `CHANGELOG.md` 首项为本分支更新，其后保留 FluffyChat 上游历史记录。
 
 ## 致谢与许可
 

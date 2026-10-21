@@ -2514,7 +2514,6 @@
         "placeholders": {}
     },
     "hideRoomsInSpaces": "Peida jututoad, mis on osa kogukonnast",
-    "possibleByYou": "Selle versiooni väljaandmine oli võimalik vaid sinu toetusele. FluffyChat jääb vabaks, avatud lähtekoodi põhiseks ja kogukonnakeskseks.",
     "showThumbnailsInTimeline": "Näita piltide ja videote pisipilte",
     "appSubtitle": "Turvaline suhtlus [matrix]'i võrgus",
     "appDescription": "Suhtle krüptitult hajutatud [matrix] võrgustikus viisil, mis on lihtne ja kõigile kättesaadav.",

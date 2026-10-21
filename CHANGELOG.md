@@ -5,6 +5,16 @@ SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
+## v2.11.1-fork.1 · 2026-10-21
+
+本分支由 [iszkq/fluffychat](https://github.com/iszkq/fluffychat) 维护。
+更新弹窗移除捐助内容，更新记录、源码与反馈入口改为本仓库；更新识别包含构建号。
+本次仅发布源码说明，不上传安装包。完整变更及已知限制见
+[本分支 Release 说明](docs/releases/v2.11.1-fork.1.md)，
+[300036 真机测试步骤](docs/testing-and-roadmap-2026-10-21.md)。
+
+以下保留上游历史记录。
+
 ## v2.9.5
 Disable android auto for Play Store builds
 
