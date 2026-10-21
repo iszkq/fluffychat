@@ -183,6 +183,31 @@ void main() {
     );
   });
 
+  test('adds the same room-link representation as other clients', () async {
+    await room.sendTextWithRoomMentions('@room ');
+    expect(room.sentContent!['body'], '@room ');
+    expect(room.mentions, {'room': true});
+    expect(
+      room.sentContent!['formatted_body'],
+      '<a href="https://matrix.to/#/!mentions:example.org">@room</a>',
+    );
+  });
+
+  test('does not nest links or turn code into a room pill', () async {
+    await room.sendTextWithRoomMentions(
+      '@room `@room ` [@room ](https://example.org)',
+    );
+    final html = room.sentContent!['formatted_body'] as String;
+    expect(
+      RegExp(
+        'href="https://matrix.to/#/!mentions:example.org"',
+      ).allMatches(html),
+      hasLength(1),
+    );
+    expect(html, contains('<code>@room </code>'));
+    expect(html, contains('<a href="https://example.org">@room </a>'));
+  });
+
   for (final command in ['send', 'me', 'plain']) {
     test('preserves /$command behavior and enforces permission', () async {
       await room.sendTextWithRoomMentions('/$command @room请看');

@@ -1,4 +1,5 @@
 {
+    "mentionEveryone": "@Everyone",
     "editImage": "Edit image",
     "@editImage": {
         "type": "String",

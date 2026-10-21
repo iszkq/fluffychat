@@ -164,8 +164,7 @@ class InputBar extends StatelessWidget {
       final userSearch = userMatch[1]!.toLowerCase();
       const roomMentionAliases = ['room', 'all', 'everyone', '全体', '所有人'];
       final userId = room.client.userID;
-      final canMentionRoom =
-          userId != null && room.canSendNotification(userId);
+      final canMentionRoom = userId != null && room.canSendNotification(userId);
       if (canMentionRoom &&
           (userSearch.isEmpty ||
               roomMentionAliases.any((alias) => alias.contains(userSearch)))) {
@@ -352,7 +351,7 @@ class InputBar extends StatelessWidget {
           dimension: size,
           child: Icon(Icons.groups_outlined),
         ),
-        title: const Text('@room'),
+        title: Text(L10n.of(context).mentionEveryone),
         subtitle: Text(L10n.of(context).sendRoomNotifications),
       );
     }
