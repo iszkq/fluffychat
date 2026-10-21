@@ -23,7 +23,7 @@ jobs:
           cache: true
       - uses: dtolnay/rust-toolchain@stable
       - name: Install native test dependencies
-        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build libsqlcipher0
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build
       - run: flutter pub get --enforce-lockfile
       - name: Verify actual SDK mention payloads
         run: flutter test --no-pub --reporter expanded test/room_mention_test.dart
