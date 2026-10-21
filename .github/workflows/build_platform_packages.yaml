@@ -98,7 +98,7 @@ jobs:
 
   macos:
     name: macOS app
-    runs-on: macos-26
+    runs-on: macos-26-intel
     steps:
       - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
@@ -112,7 +112,7 @@ jobs:
       - name: Generate macOS build configuration
         run: flutter build macos --release --config-only
       - name: Build unsigned macOS app
-        run: xcodebuild -project macos/Runner.xcodeproj -scheme Runner -configuration Release -derivedDataPath build/macos ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO 2>&1 | tee macos-build.log
+        run: xcodebuild -project macos/Runner.xcodeproj -scheme Runner -configuration Release -derivedDataPath build/macos ARCHS=x86_64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO 2>&1 | tee macos-build.log
         shell: bash
       - name: Upload macOS diagnostic log
         if: failure()
