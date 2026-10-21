@@ -1,0 +1,157 @@
+# SPDX-FileCopyrightText: 2026 Contributors to FluffyChat
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: Build Platform Packages
+
+on:
+  push:
+    branches: [codex/chinese-mentions]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/free_up_space
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - run: flutter pub get
+      - run: flutter build apk --debug --target-platform android-arm,android-arm64
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fluffychat-android-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+
+  ios:
+    name: iOS unsigned IPA
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - run: sudo xcode-select --switch /Applications/Xcode_26.2.app
+      - run: brew install sqlcipher
+      - run: flutter config --enable-swift-package-manager
+      - uses: dtolnay/rust-toolchain@stable
+      - run: flutter pub get
+      - run: flutter build ios --release --no-codesign
+      - name: Package unsigned and sideload IPAs
+        run: |
+          mkdir -p build/unsigned-ipa/Payload build/sideload-ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/unsigned-ipa/Payload/
+          cp -R build/ios/iphoneos/Runner.app build/sideload-ipa/Payload/
+          rm -rf build/sideload-ipa/Payload/Runner.app/PlugIns
+          (cd build/unsigned-ipa && zip -qry ../../fluffychat-ios-unsigned.ipa Payload)
+          (cd build/sideload-ipa && zip -qry ../../fluffychat-ios-sideload.ipa Payload)
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fluffychat-ios-ipas
+          path: |
+            fluffychat-ios-unsigned.ipa
+            fluffychat-ios-sideload.ipa
+          retention-days: 14
+
+  windows:
+    name: Windows x64
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - name: Package Windows app
+        shell: pwsh
+        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath fluffychat-windows-x64.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fluffychat-windows-x64
+          path: fluffychat-windows-x64.zip
+          retention-days: 14
+
+  macos:
+    name: macOS app
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - run: brew install sqlcipher
+      - run: flutter config --enable-swift-package-manager
+      - uses: dtolnay/rust-toolchain@stable
+      - run: flutter pub get
+      - run: flutter build macos --release
+      - run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/FluffyChat.app fluffychat-macos.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fluffychat-macos
+          path: fluffychat-macos.zip
+          retention-days: 14
+
+  linux:
+    name: Linux x64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libblkid-dev liblzma-dev libjsoncpp-dev libsecret-1-dev libsecret-1-0 librhash0 libssl-dev libwebkit2gtk-4.1-dev libpulse-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - run: flutter pub get
+      - run: flutter build linux --release
+      - run: tar -czf fluffychat-linux-x64.tar.gz -C build/linux/x64/release/bundle .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fluffychat-linux-x64
+          path: fluffychat-linux-x64.tar.gz
+          retention-days: 14
+
+  web:
+    name: Web package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install web build tools
+        run: |
+          rustup toolchain install nightly-x86_64-unknown-linux-gnu --profile minimal --component rust-src
+          curl --fail --silent --show-error --location https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 --output "$RUNNER_TEMP/yq"
+          chmod +x "$RUNNER_TEMP/yq"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - run: flutter config --enable-web --no-analytics
+      - run: flutter precache --web
+      - run: flutter pub get
+      - run: ./scripts/prepare-web.sh
+      - run: flutter build web --release --dart-define=FLUTTER_WEB_CANVASKIT_URL=canvaskit/
+      - run: cp config.sample.json build/web/config.json
+      - run: cd build/web && zip -qr ../../fluffychat-web.zip .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: fluffychat-web
+          path: fluffychat-web.zip
+          retention-days: 14
