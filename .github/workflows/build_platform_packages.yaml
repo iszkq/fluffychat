@@ -76,6 +76,7 @@ jobs:
       - name: Build Windows with diagnostic log
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Continue'
           flutter build windows --release -v 2>&1 | Tee-Object -FilePath windows-build.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Package Windows app
@@ -107,10 +108,11 @@ jobs:
       - run: flutter config --enable-swift-package-manager
       - uses: dtolnay/rust-toolchain@stable
       - run: flutter pub get
+      - name: Generate macOS build configuration
+        run: flutter build macos --release --config-only
       - name: Build unsigned macOS app
-        run: flutter build macos --release -v 2>&1 | tee macos-build.log
-        env:
-          CODE_SIGNING_ALLOWED: NO
+        run: xcodebuild -project macos/Runner.xcodeproj -scheme Runner -configuration Release -derivedDataPath build/macos CODE_SIGNING_ALLOWED=NO 2>&1 | tee macos-build.log
+        shell: bash
       - name: Upload macOS diagnostic log
         if: failure()
         uses: actions/upload-artifact@v7
