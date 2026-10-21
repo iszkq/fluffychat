@@ -12,8 +12,25 @@ permissions:
   contents: read
 
 jobs:
+  verify_mentions:
+    name: Verify room mentions
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install native test dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build libsqlcipher0
+      - run: flutter pub get --enforce-lockfile
+      - name: Verify actual SDK mention payloads
+        run: flutter test --no-pub --reporter expanded test/room_mention_test.dart
+
   android:
     name: Android APK
+    needs: verify_mentions
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -33,6 +50,7 @@ jobs:
 
   ios:
     name: iOS unsigned IPA
+    needs: verify_mentions
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
@@ -64,13 +82,21 @@ jobs:
 
   windows:
     name: Windows x64
+    needs: verify_mentions
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v7
       - uses: ilammy/setup-nasm@v1
+      - name: Read pinned Flutter version without Chocolatey
+        shell: pwsh
+        run: |
+          $config = Get-Content .tool_versions.yaml -Raw
+          $match = [regex]::Match($config, '(?m)^\s*flutter:\s*([0-9.]+)')
+          if (-not $match.Success) { throw 'Flutter version not found' }
+          "FLUTTER_VERSION=$($match.Groups[1].Value)" >> $env:GITHUB_ENV
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version-file: .tool_versions.yaml
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
       - uses: dtolnay/rust-toolchain@stable
       - run: flutter pub get
@@ -98,6 +124,7 @@ jobs:
 
   macos:
     name: macOS app
+    needs: verify_mentions
     runs-on: macos-26-intel
     steps:
       - uses: actions/checkout@v7
@@ -150,6 +177,7 @@ jobs:
 
   linux:
     name: Linux x64
+    needs: verify_mentions
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -173,6 +201,7 @@ jobs:
 
   web:
     name: Web package
+    needs: verify_mentions
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

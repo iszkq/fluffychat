@@ -28,6 +28,7 @@ import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call.dart
 import 'package:fluffychat/utils/matrix_sdk_extensions/event_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/filtered_timeline_extension.dart';
 import 'package:fluffychat/utils/matrix_sdk_extensions/matrix_locals.dart';
+import 'package:fluffychat/utils/matrix_sdk_extensions/room_mention_extension.dart';
 import 'package:fluffychat/utils/object_url.dart';
 import 'package:fluffychat/utils/other_party_can_receive.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
@@ -46,7 +47,6 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
-import 'package:matrix/src/utils/markdown.dart' show markdown;
 import 'package:pasteboard/pasteboard.dart';
 import 'package:scroll_to_index/scroll_to_index.dart';
 import 'package:universal_html/universal_html.dart' as web;
@@ -787,48 +787,14 @@ class ChatController extends State<ChatPageWithRoom>
       room.setTyping(false);
     }
 
-    final message = sendController.text;
-    final userId = room.client.userID;
-    final hasRoomMention =
-        userId != null &&
-        room.canSendNotification(userId) &&
-        RegExp(r'(?<![A-Za-z0-9_])@room(?![A-Za-z0-9_])', unicode: true)
-            .hasMatch(message);
-
-    // The Matrix SDK detects @room by splitting on whitespace, which misses
-    // Chinese text written immediately after the mention (for example @room请看).
-    if (hasRoomMention && parseCommands && commandMatch == null) {
-      final content = <String, dynamic>{
-        'msgtype': MessageTypes.Text,
-        'body': message,
-        'm.mentions': {'room': true},
-      };
-      final formattedBody = markdown(
-        message,
-        getEmotePacks: () => room.getImagePacksFlat(ImagePackUsage.emoticon),
-        getMention: room.getMention,
-        convertLinebreaks: room.client.convertLinebreaksInFormatting,
-        enableLatex: room.client.enableLatexMarkdown,
-      );
-      content['format'] = 'org.matrix.custom.html';
-      content['formatted_body'] = formattedBody;
-      // ignore: unawaited_futures
-      room.sendEvent(
-        content,
-        inReplyTo: replyEvent,
-        editEventId: editEvent?.eventId,
-        threadRootEventId: activeThreadId,
-      );
-    } else {
-      // ignore: unawaited_futures
-      room.sendTextEvent(
-        message,
-        inReplyTo: replyEvent,
-        editEventId: editEvent?.eventId,
-        parseCommands: parseCommands,
-        threadRootEventId: activeThreadId,
-      );
-    }
+    // ignore: unawaited_futures
+    room.sendTextWithRoomMentions(
+      sendController.text,
+      inReplyTo: replyEvent,
+      editEventId: editEvent?.eventId,
+      parseCommands: parseCommands,
+      threadRootEventId: activeThreadId,
+    );
     sendController.value = TextEditingValue(
       text: pendingText,
       selection: const TextSelection.collapsed(offset: 0),
