@@ -109,6 +109,26 @@ jobs:
       - run: flutter config --enable-swift-package-manager
       - uses: dtolnay/rust-toolchain@stable
       - run: flutter pub get
+      - name: Use portable webcrypto implementation on macOS
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+
+          package = Path(os.environ['HOME']) / '.pub-cache/hosted/pub.dev/webcrypto-0.6.1/src/CMakeLists.txt'
+          source = package.read_text()
+          marker = 'include(\n  ../third_party/boringssl/sources.cmake\n)'
+          replacement = marker + '''
+
+          if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+            add_definitions(-DOPENSSL_NO_ASM)
+            set(crypto_sources_${PLATFORM}_${ARCH})
+          endif()
+          '''
+          if marker not in source:
+              raise SystemExit('webcrypto CMake source layout changed')
+          package.write_text(source.replace(marker, replacement, 1))
       - name: Generate macOS build configuration
         run: flutter build macos --release --config-only
       - name: Build unsigned macOS app
