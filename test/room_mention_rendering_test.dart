@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Contributors to FluffyChat
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/chat/events/html_message.dart';
@@ -26,7 +27,11 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('zh'),
-        localizationsDelegates: L10n.localizationsDelegates,
+        localizationsDelegates: [
+          ...L10n.localizationsDelegates,
+          ...GlobalMaterialLocalizations.delegates,
+          ...GlobalCupertinoLocalizations.delegates,
+        ],
         supportedLocales: L10n.supportedLocales,
         home: Scaffold(
           body: HtmlMessage(
