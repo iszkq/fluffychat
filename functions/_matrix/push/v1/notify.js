@@ -4,7 +4,6 @@
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const MAX_REQUEST_BYTES = 64 * 1024;
-const NTFY_PUSHKEY_PREFIX = 'ntfy:';
 
 let cachedAccessToken;
 
@@ -132,87 +131,6 @@ const createMessageData = (notification, device) => {
   return data;
 };
 
-const getNtfyTopic = (device) => {
-  if (typeof device?.pushkey !== 'string') return null;
-  if (!device.pushkey.startsWith(NTFY_PUSHKEY_PREFIX)) return null;
-  const topic = device.pushkey.slice(NTFY_PUSHKEY_PREFIX.length).trim();
-  return topic || null;
-};
-
-const createNtfyMessage = (notification, device) => {
-  const roomName = notification.room_name || 'Matrix 房间';
-  const sender = notification.sender_display_name || '新消息';
-  const unread = notification.counts?.unread;
-  const roomId = notification.room_id;
-  const eventId = notification.event_id;
-  const clientName = device.data?.client_name;
-  const query = new URLSearchParams();
-  if (eventId) query.set('event', eventId);
-  if (clientName) query.set('client', clientName);
-  const deepLink = roomId
-    ? `im.fluffychat://room/${encodeURIComponent(roomId)}${query.size ? `?${query}` : ''}`
-    : 'im.fluffychat://';
-
-  return {
-    topic: getNtfyTopic(device),
-    title: roomName,
-    message: unread ? `${sender} · ${unread} 条未读消息` : `${sender} 有新消息`,
-    click: deepLink,
-    actions: [
-      {
-        action: 'view',
-        label: '打开 FluffyChat',
-        url: deepLink,
-        clear: true,
-      },
-    ],
-    tags: ['speech_balloon'],
-    priority: notification.prio === 'low' ? 3 : 4,
-  };
-};
-
-const sendToNtfy = async (notification, device, configuredBaseUrl) => {
-  const topic = getNtfyTopic(device);
-  if (!topic) return null;
-
-  const baseUrl = String(configuredBaseUrl || 'https://ntfy.sh').replace(
-    /\/$/,
-    '',
-  );
-  const message = createNtfyMessage(notification, device);
-  const response = await fetch(baseUrl, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-    },
-    body: JSON.stringify(message),
-  });
-
-  if (response.ok) return { rejected: false };
-
-  const fallbackResponse = await fetch(
-    `${baseUrl}/${encodeURIComponent(topic)}`,
-    {
-      method: 'POST',
-      headers: {
-        'content-type': 'text/plain; charset=utf-8',
-        Title: message.title,
-        Priority: String(message.priority),
-        Tags: message.tags.join(','),
-        Click: message.click,
-        Actions: `view, Open FluffyChat, ${message.click}, clear=true`,
-      },
-      body: message.message,
-    },
-  );
-
-  if (fallbackResponse.ok) return { rejected: false };
-  if (response.status >= 400 && response.status < 500) {
-    return { rejected: true };
-  }
-  return { rejected: false, temporaryFailure: true };
-};
-
 const permanentFcmFailure = (status, responseBody) => {
   if (status === 404) return true;
   const details = responseBody?.error?.details;
@@ -299,22 +217,17 @@ export async function onRequestPost(context) {
 
   let account;
   let accessToken;
-  if (devices.some((device) => !getNtfyTopic(device))) {
-    try {
-      account = parseServiceAccount(context.env.FIREBASE_SERVICE_ACCOUNT);
-      accessToken = await createAccessToken(account);
-    } catch (error) {
-      console.error('Firebase configuration error:', error?.message || error);
-      return jsonResponse({ error: 'Push service is not configured.' }, 503);
-    }
+  try {
+    account = parseServiceAccount(context.env.FIREBASE_SERVICE_ACCOUNT);
+    accessToken = await createAccessToken(account);
+  } catch (error) {
+    console.error('Firebase configuration error:', error?.message || error);
+    return jsonResponse({ error: 'Push service is not configured.' }, 503);
   }
 
   const results = await Promise.all(
     devices.map((device) =>
-      (getNtfyTopic(device)
-        ? sendToNtfy(notification, device, context.env.NTFY_BASE_URL)
-        : sendToDevice(account, accessToken, notification, device)
-      ).catch((error) => {
+      sendToDevice(account, accessToken, notification, device).catch((error) => {
         console.error('Unable to contact push service:', error?.message || error);
         return { rejected: false, temporaryFailure: true };
       }),

@@ -15,17 +15,16 @@ import 'dart:ui';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/main.dart';
 import 'package:fluffychat/utils/notification_background_handler.dart';
+import 'package:fluffychat/utils/notification_launch_handler.dart';
 import 'package:fluffychat/utils/push_helper.dart';
-import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
+import 'package:fluffychat/utils/retire_legacy_ios_push.dart';
 import 'package:fluffychat/widgets/fluffy_chat_app.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 import 'package:unifiedpush/unifiedpush.dart';
 import 'package:unifiedpush_ui/unifiedpush_ui.dart';
-import 'package:uuid/uuid.dart';
 
 import '../config/app_config.dart';
 import '../config/setting_keys.dart';
@@ -64,7 +63,6 @@ class BackgroundPush {
   DateTime? lastReceivedPush;
 
   bool upAction = false;
-  final Map<String, Future<String>> _ntfyTopics = {};
 
   Future<void> _init() async {
     //<GOOGLE_SERVICES>firebaseEnabled = true;
@@ -265,73 +263,37 @@ class BackgroundPush {
 
   final pusherDataMessageFormat = Platform.isAndroid;
 
-  static bool _wentToRoomOnStartup = false;
+  final _notificationLaunch = NotificationLaunchHandler();
 
   Future<void> setupPush(BuildContext context) async {
-    // Android receives notifications from its live Matrix sync connection.
-    // Do not register another push transport or show an FCM warning, because
-    // that would either duplicate notifications or require Google services.
-    if (PlatformInfos.isAndroid) return;
-
+    // Android uses live Matrix sync. iOS relay registration has been removed.
+    await openRoomFromNotification();
     if (PlatformInfos.isIOS) {
-      for (final client in clients) {
-        if (client.onLoginStateChanged.value != LoginState.loggedIn ||
-            !PlatformInfos.isMobile ||
-            matrix == null) {
-          continue;
+      for (final client in clients.where((client) => client.isLogged())) {
+        try {
+          await retireLegacyIosPush(client, AppSettings.store);
+        } catch (error, stackTrace) {
+          Logs().w('Unable to retire the legacy iOS relay', error, stackTrace);
         }
-        final topic = await setupNtfy(client);
-        if (topic != null && context.mounted) {
-          await _showNtfyTopicNotice(context, client);
-        }
-      }
-    } else if (PlatformInfos.isAndroid &&
-        (await UnifiedPush.getDistributors()).isNotEmpty &&
-        context.mounted) {
-      await UnifiedPushUi(
-        context: context,
-        instances: ['default'],
-        unifiedPushFunctions: UPFunctions(),
-        showNoDistribDialog: false,
-        onNoDistribDialogDismissed: () {}, // TODO: Implement me
-      ).registerAppWithDialog();
-    } else {
-      for (final client in clients) {
-        Logs().d('SetupPush for Client ${client.clientName}');
-        if (client.onLoginStateChanged.value != LoginState.loggedIn ||
-            !PlatformInfos.isMobile ||
-            matrix == null) {
-          return;
-        }
-        // Do not setup unifiedpush if this has been initialized by
-        // an unifiedpush action
-        if (upAction) {
-          return;
-        }
-        await setupFirebase(client);
       }
     }
+  }
 
-    // ignore: unawaited_futures
-    _flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails().then((
-      details,
-    ) {
-      if (details == null ||
-          !details.didNotificationLaunchApp ||
-          _wentToRoomOnStartup) {
-        return;
-      }
-      _wentToRoomOnStartup = true;
-      final response = details.notificationResponse;
-      if (response != null) {
-        notificationTap(
+  Future<void> openRoomFromNotification({bool newActivity = false}) async {
+    if (newActivity) _notificationLaunch.reset();
+    try {
+      await _notificationLaunch.handle(
+        load: _flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails,
+        open: (response) => notificationTap(
           response,
           clients: clients,
           router: FluffyChatApp.router,
           l10n: l10n,
-        );
-      }
-    });
+        ),
+      );
+    } catch (error, stackTrace) {
+      Logs().w('Unable to open the launch notification', error, stackTrace);
+    }
   }
 
   Future<void> _noFcmWarning() async {
@@ -388,75 +350,6 @@ class BackgroundPush {
       gatewayUrl: AppSettings.pushNotificationsGatewayUrl.value,
       token: _fcmToken,
     );
-  }
-
-  Future<String?> setupNtfy(Client client) async {
-    final topic = await getNtfyTopic(client);
-    if (topic == null) return null;
-
-    final gatewayUrl = AppSettings.pushNotificationsGatewayUrl.value.trim();
-    if (gatewayUrl.isEmpty) {
-      Logs().w('[Push] Matrix push gateway URL is empty');
-      return topic;
-    }
-
-    await setupPusher(
-      client: client,
-      gatewayUrl: gatewayUrl,
-      token: 'ntfy:$topic',
-    );
-    return topic;
-  }
-
-  Future<void> _showNtfyTopicNotice(
-    BuildContext context,
-    Client client,
-  ) async {
-    final userId = client.userID;
-    if (userId == null || !context.mounted) return;
-
-    final store = await AppSettings.init();
-    final noticeKey =
-        '${AppConfig.ntfyTopicNoticePrefix}${client.clientName}.$userId';
-    if (store.getBool(noticeKey) == true) return;
-    await store.setBool(noticeKey, true);
-
-    if (!context.mounted) return;
-    final isChinese = Localizations.localeOf(context).languageCode == 'zh';
-    await showOkCancelAlertDialog(
-      context: context,
-      title: isChinese ? 'ntfy 通知已准备好' : 'ntfy notifications are ready',
-      message: isChinese
-          ? '请在 ntfy App 中订阅主题。完整主题可在 FluffyChat 的个人设置中查看和复制。'
-          : 'Subscribe to the topic in the ntfy app. You can view and copy the full topic later in Personal Settings.',
-      okLabel: isChinese ? '知道了' : 'Got it',
-      cancelLabel: isChinese ? '稍后查看' : 'Later',
-    );
-  }
-
-  Future<String?> getNtfyTopic(Client client) async {
-    if (!PlatformInfos.isIOS) return null;
-    final userId = client.userID;
-    if (userId == null) return null;
-
-    final key =
-        '${AppConfig.ntfyTopicStoragePrefix}${client.clientName}.$userId';
-
-    final topicFuture = _ntfyTopics.putIfAbsent(
-      key,
-      () async {
-        final store = await AppSettings.init();
-        final existingTopic = store.getString(key)?.trim();
-        if (existingTopic != null && existingTopic.isNotEmpty) {
-          return existingTopic;
-        }
-
-        final topic = 'fluffychat-${Uuid().v4().replaceAll('-', '')}';
-        await store.setString(key, topic);
-        return topic;
-      },
-    );
-    return topicFuture;
   }
 
   Future<void> _newUpEndpoint(PushEndpoint newPushEndpoint, String i) async {

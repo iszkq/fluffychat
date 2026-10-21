@@ -38,15 +38,10 @@ Future<String?> getDatabaseCipher() async {
         return _handleCipherError(
           privateStorageError,
           privateStorageStackTrace,
-          _privateIosOptions,
         );
       }
     }
-    return _handleCipherError(
-      sharedStorageError,
-      sharedStorageStackTrace,
-      _sharedIosOptions,
-    );
+    return _handleCipherError(sharedStorageError, sharedStorageStackTrace);
   }
 }
 
@@ -74,10 +69,14 @@ Future<String> _readOrCreateDatabaseCipher(
         value: privatePassword,
         iOptions: iosOptions,
       );
-      await privateStorage.delete(
+      final migratedPassword = await secureStorage.read(
         key: _passwordStorageKey,
-        iOptions: _privateIosOptions,
+        iOptions: iosOptions,
       );
+      if (migratedPassword != privatePassword) {
+        throw StateError('The migrated database key could not be verified');
+      }
+      // Retain the private copy for future sideloads without shared Keychain.
       return privatePassword;
     }
   }
@@ -103,14 +102,7 @@ Future<String> _readOrCreateDatabaseCipher(
   return password;
 }
 
-String? _handleCipherError(
-  Object exception,
-  StackTrace stackTrace,
-  IOSOptions iosOptions,
-) {
-  FlutterSecureStorage(
-    iOptions: iosOptions,
-  ).delete(key: _passwordStorageKey, iOptions: iosOptions).catchError((_) {});
+String? _handleCipherError(Object exception, StackTrace stackTrace) {
   if (exception is MissingPluginException) {
     Logs().w(
       'Database encryption is not supported on this platform',
@@ -118,6 +110,8 @@ String? _handleCipherError(
     );
   } else {
     Logs().w('Unable to init database encryption', exception, stackTrace);
+    // A temporarily locked or inaccessible Keychain is not a missing key.
+    Error.throwWithStackTrace(exception, stackTrace);
   }
   _sendNoEncryptionWarning(exception);
   return null;

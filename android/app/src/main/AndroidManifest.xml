@@ -82,6 +82,7 @@
                <category android:name="android.intent.category.DEFAULT" />
                <category android:name="android.intent.category.BROWSABLE" />
                <data android:scheme="im.fluffychat" android:host="chat" />
+               <data android:scheme="im.fluffychat" android:host="room" />
             </intent-filter>
 
             <!-- App can receive shared text -->

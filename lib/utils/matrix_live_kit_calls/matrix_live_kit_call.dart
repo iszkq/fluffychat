@@ -12,29 +12,57 @@ import 'package:fluffychat/utils/matrix_live_kit_calls/call_keys_event_content.d
 import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call_member.dart';
 import 'package:matrix/matrix.dart';
 
+bool _isLiveKitUrl(String value) {
+  final uri = Uri.tryParse(value);
+  return uri != null &&
+      const {'https', 'http'}.contains(uri.scheme) &&
+      uri.host.isNotEmpty;
+}
+
 extension MatrixRtcClientExtension on Client {
   Future<List<String>> getLiveKitServiceUrls() async {
-    final wellKnown = await getWellknown();
-    final rtcFociMap = wellKnown.additionalProperties
-        .tryGetMap<String, Object?>(
-          'org.matrix.msc4143.rtc_foci',
-          TryGet.silent,
-        ); // Famedly style
-    if (rtcFociMap != null) {
-      return [?rtcFociMap.tryGet<String>('livekit_service_url')];
-    }
-
-    // TODO: Also query /_matrix/client/unstable/org.matrix.msc4143/rtc/transports
-
-    return wellKnown.additionalProperties
-            .tryGetList<Map<String, Object?>>('org.matrix.msc4143.rtc_foci')
-            ?.map((foci) => foci.tryGet<String>('livekit_service_url'))
+    try {
+      final response = await request(
+        .GET,
+        '/client/unstable/org.matrix.msc4143/rtc/transports',
+      ).timeout(const Duration(seconds: 10));
+      final transports = response['transports'];
+      if (transports is List) {
+        final urls = transports
+            .whereType<Map>()
+            .where((transport) => transport['type'] == 'm.livekit')
+            .map((transport) => transport['url'])
             .whereType<String>()
-            .toList() ??
-        [
-          if (AppSettings.fallbackLiveKitInstance.value.isNotEmpty)
-            AppSettings.fallbackLiveKitInstance.value,
-        ];
+            .where(_isLiveKitUrl)
+            .toSet()
+            .toList();
+        if (urls.isNotEmpty) return urls;
+      }
+    } catch (error) {
+      Logs().d('RTC transports unavailable; trying well-known', error);
+    }
+    try {
+      final wellKnown = await getWellknown();
+      final foci =
+          wellKnown.additionalProperties['org.matrix.msc4143.rtc_foci'];
+      final entries = foci is Map
+          ? [foci]
+          : foci is List
+          ? foci
+          : const [];
+      final urls = entries
+          .whereType<Map>()
+          .map((focus) => focus['livekit_service_url'])
+          .whereType<String>()
+          .where(_isLiveKitUrl)
+          .toSet()
+          .toList();
+      if (urls.isNotEmpty) return urls;
+    } catch (error) {
+      Logs().d('RTC well-known unavailable; trying configured fallback', error);
+    }
+    final fallback = AppSettings.fallbackLiveKitInstance.value.trim();
+    return [if (_isLiveKitUrl(fallback)) fallback];
   }
 
   Stream<CallKeysEvent> get onCallEncryptionKeys => onToDeviceEvent.stream

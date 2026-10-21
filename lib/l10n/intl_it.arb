@@ -2542,7 +2542,6 @@
         "description": "This should be a very short string because there is not much space in the button!"
     },
     "createNewChat": "Crea una nuova chat",
-    "supportFluffyChat": "Supporta FluffyChat",
     "setLowPriority": "Imposta priorità bassa",
     "unsetLowPriority": "Rimuovi priorità bassa",
     "playSoundOnNotification": "Riproduci suono per le notifiche",

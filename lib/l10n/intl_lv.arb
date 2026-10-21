@@ -2488,7 +2488,6 @@
     "unsetLowPriority": "Noņemt zemu svatīgumu",
     "setLowPriority": "Iestatīt zemu svarīgumu",
     "removeTag": "Noņemt birku",
-    "supportFluffyChat": "Atbalstīt FluffyChat",
     "discardEdits": "Ir nesaglabātas izmaiņas. Atmest labojumus?",
     "@discardEdits": {
         "type": "String",

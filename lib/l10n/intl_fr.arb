@@ -2487,7 +2487,6 @@
     "approve": "Approuver",
     "notificationRuleRoomnotifDescription": "Notifie l'utilisateur/trice lorsqu'un message contient '@room'.",
     "generalNotificationSettings": "Réglages généraux des notifications",
-    "supportFluffyChat": "Soutenir FluffyChat",
     "notificationRuleEncrypted": "Chiffré",
     "pleaseFillOut": "Veuillez remplir",
     "changedTheChatName": "{username} a changé le nom de la discussion",

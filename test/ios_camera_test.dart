@@ -1,9 +1,12 @@
 // SPDX-FileCopyrightText: 2019-Present Contributors to FluffyChat
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:io';
+
 import 'package:fluffychat/utils/ios_camera.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as path;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -15,13 +18,17 @@ void main() {
   test(
     'requests app language and returns a JPEG file from native camera',
     () async {
+      final photoPath = path.join(
+        Directory.systemTemp.path,
+        'camera-landscape.jpg',
+      );
       messenger.setMockMethodCallHandler(channel, (call) async {
         expect(call.method, 'capturePhoto');
         expect(call.arguments, {'languageCode': 'zh-Hans'});
-        return '/tmp/camera-landscape.jpg';
+        return photoPath;
       });
       final photo = await IosCamera.capturePhoto('zh-Hans');
-      expect(photo!.path, '/tmp/camera-landscape.jpg');
+      expect(photo!.path, photoPath);
       expect(photo.mimeType, 'image/jpeg');
       expect(photo.name, 'camera-landscape.jpg');
     },

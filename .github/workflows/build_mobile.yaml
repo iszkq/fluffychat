@@ -16,11 +16,6 @@ on:
         required: true
         default: https://124.222.193.241:6258
         type: string
-      push_notifications_gateway_url:
-        description: Matrix Push Gateway URL ending in /_matrix/push/v1/notify
-        required: true
-        default: https://124.222.193.241:6259/_matrix/push/v1/notify
-        type: string
 
 permissions:
   contents: read
@@ -51,7 +46,10 @@ jobs:
             test/voice_message_caf_converter_test.dart \
             test/normalize_camera_image_test.dart \
             test/ios_camera_test.dart \
-            test/android_background_notifications_mode_test.dart
+            test/android_background_notifications_mode_test.dart \
+            test/deep_links_test.dart test/notification_launch_handler_test.dart \
+            test/settings_reset_test.dart test/retire_legacy_ios_push_test.dart \
+            test/database_recovery_test.dart test/rtc_discovery_test.dart
 
       - name: Configure stable release signing
         env:
@@ -136,13 +134,18 @@ jobs:
           test/ios_camera_test.dart
           test/pages/chat/send_file_dialog_test.dart
           test/voice_message_caf_converter_test.dart
+          test/deep_links_test.dart
+          test/notification_launch_handler_test.dart
+          test/retire_legacy_ios_push_test.dart
+          test/settings_reset_test.dart
+          test/database_recovery_test.dart
+          test/rtc_discovery_test.dart
 
       - name: Build iOS app without signing
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
           VOICE_TRANSCRIPTION_ENDPOINT: ${{ inputs.voice_transcription_endpoint }}
           OFFICE_EDITOR_URL: ${{ inputs.office_editor_url }}
-          PUSH_NOTIFICATIONS_GATEWAY_URL: ${{ inputs.push_notifications_gateway_url }}
         run: >-
           flutter build ios
           --release
@@ -150,7 +153,6 @@ jobs:
           --build-number=$((300000 + GITHUB_RUN_NUMBER))
           --dart-define="VOICE_TRANSCRIPTION_ENDPOINT=${VOICE_TRANSCRIPTION_ENDPOINT}"
           --dart-define="OFFICE_EDITOR_URL=${OFFICE_EDITOR_URL}"
-          --dart-define="PUSH_NOTIFICATIONS_GATEWAY_URL=${PUSH_NOTIFICATIONS_GATEWAY_URL}"
 
       - name: Verify packaged camera and record build identity
         run: |

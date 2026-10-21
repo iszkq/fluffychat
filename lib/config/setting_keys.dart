@@ -40,10 +40,7 @@ enum AppSettings<T> {
   unifiedPushEndpoint<String>('chat.fluffy.unifiedpush.endpoint', ''),
   pushNotificationsGatewayUrl<String>(
     'pushNotificationsGatewayUrl',
-    String.fromEnvironment(
-      'PUSH_NOTIFICATIONS_GATEWAY_URL',
-      defaultValue: 'https://124.222.193.241:6259/_matrix/push/v1/notify',
-    ),
+    'https://push.fluffychat.im/_matrix/push/v1/notify',
   ),
   pushNotificationsPusherFormat<String>(
     'pushNotificationsPusherFormat',
@@ -139,7 +136,10 @@ enum AppSettings<T> {
   }
 
   static Future<void> reset({bool loadWebConfigFile = true}) async {
-    await AppSettings._store!.clear();
+    for (final setting in AppSettings.values) {
+      await AppSettings.store.remove(setting.key);
+    }
+    _store = null;
     await init(loadWebConfigFile: loadWebConfigFile);
   }
 

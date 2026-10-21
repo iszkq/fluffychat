@@ -234,10 +234,48 @@ class ChatController extends State<ChatPageWithRoom>
     );
   }
 
-  Future<void> leaveChat() async {
+  Future<void> joinChat() async {
     final success = await showFutureLoadingDialog(
       context: context,
-      future: room.leave,
+      future: () async {
+        await room.join(waitForSync: true);
+      },
+    );
+    if (!mounted) return;
+    if (success.error != null) return;
+    if (room.isSpace) {
+      context.go('/rooms?spaceId=${room.id}');
+      return;
+    }
+    await _tryLoadTimeline();
+  }
+
+  Future<void> leaveChat() async {
+    var blockInviter = false;
+    if (room.membership == .invite) {
+      final blockConsent = await showOkCancelAlertDialog(
+        context: context,
+        title: L10n.of(context).declineInvitation,
+        message: L10n.of(context).doYouAlsoWantToBlock,
+        cancelLabel: L10n.of(context).decline,
+        okLabel: L10n.of(context).declineAndBlock,
+        isDestructive: true,
+      );
+      if (blockConsent == null) return;
+      if (!mounted) return;
+      blockInviter = blockConsent == .ok;
+    }
+    final success = await showFutureLoadingDialog(
+      context: context,
+      future: () async {
+        if (blockInviter) {
+          final invite = await room.requestUser(room.client.userID!);
+          final inviter = invite?.senderId;
+          if (inviter == null) throw StateError('The invitation has no sender');
+          await room.client.ignoreUser(inviter);
+        }
+        await room.leave();
+      },
     );
     if (!mounted) return;
     if (success.error != null) return;
@@ -473,6 +511,8 @@ class ChatController extends State<ChatPageWithRoom>
   }
 
   Future<void> _tryLoadTimeline() async {
+    if (room.membership == .invite) return;
+
     final initialEventId = widget.eventId;
     loadTimelineFuture = _getTimeline();
     try {
@@ -995,8 +1035,9 @@ class ChatController extends State<ChatPageWithRoom>
     revokeObjectUrl(path);
     if (bytes == null) return;
 
+    final isAacRecording = fileName.toLowerCase().endsWith('.m4a');
     try {
-      bytes = await normalizeVoiceMessageToOgg(bytes);
+      if (!isAacRecording) bytes = await normalizeVoiceMessageToOgg(bytes);
     } catch (error, stackTrace) {
       Logs().w('Unable to convert voice message to OGG', error, stackTrace);
       if (!mounted) return;
@@ -1011,8 +1052,10 @@ class ChatController extends State<ChatPageWithRoom>
       );
       return;
     }
-    const mimeType = 'audio/ogg';
-    fileName = 'voice_message_${DateTime.now().millisecondsSinceEpoch}.ogg';
+    final mimeType = isAacRecording ? 'audio/mp4' : 'audio/ogg';
+    final extension = isAacRecording ? 'm4a' : 'ogg';
+    fileName =
+        'voice_message_${DateTime.now().millisecondsSinceEpoch}.$extension';
 
     final file = MatrixAudioFile(
       bytes: bytes,

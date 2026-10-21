@@ -3,6 +3,8 @@
 
 # 上游同步进度
 
+> 历史记录：2026-10-21 已移除旧 iOS 第三方通知集成；本轮结果见 `optimization-status-2026-10-21.md`。
+
 比较基线：我的仓库 `fa88a20e703ca28f68aebece7de2980e3dff7104`，上游 `f94804398acf2c24b50f1b3f4cf9b47d783044d8`。
 
 ## 已移植
@@ -16,7 +18,7 @@
 - Android 汇总通知排除自己，子通知非空时保留，并静默更新；保留账号分组。
 - 备份集成测试增加密码确认；新增已读并发/失败重试和汇总通知回归测试。
 
-保留照片发送、云贴纸、语音转录、Office、Android 常驻同步、iOS ntfy/SideStore、无 App Group 回退和 Cloudflare 部署。Matrix 仍固定 hosted 14.0.0。
+保留照片发送、云贴纸、语音转录、Office、Android 常驻同步、iOS SideStore、无 App Group 回退和 Cloudflare 部署。Matrix 仍固定 hosted 14.0.0。
 
 ## 验证
 

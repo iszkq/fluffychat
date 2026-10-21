@@ -5,23 +5,13 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-PUSH_NOTIFICATIONS_GATEWAY_URL="${PUSH_NOTIFICATIONS_GATEWAY_URL:-https://124.222.193.241:6259/_matrix/push/v1/notify}"
-
 flutter clean
+flutter config --enable-swift-package-manager
 flutter pub get
 
-# Reload all cocoapods
-(
-  cd ios
-  rm -rf Pods Podfile.lock
-  pod install
-  pod update
-)
-
-# pub get hardcodes FlutterGeneratedPluginSwiftPackage to iOS 13.0; regenerate so
-# it picks up the project's IPHONEOS_DEPLOYMENT_TARGET before xcodebuild.
-flutter build ios --config-only --release \
-  --dart-define=PUSH_NOTIFICATIONS_GATEWAY_URL="$PUSH_NOTIFICATIONS_GATEWAY_URL"
+# Regenerate plugin configuration before archiving so Swift Package targets pick
+# up the project's deployment target.
+flutter build ios --config-only --release
 
 # Build and open archive dialog
 xcodebuild \

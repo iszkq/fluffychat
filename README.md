@@ -14,7 +14,7 @@ Web、Windows、macOS 和 Linux。
 ## 本仓库新增和改进
 
 - 支持同时选择多个私聊或群聊转发消息。
-- 保持非 iOS 平台优先发送 OGG/Opus 语音，兼容 Element X。
+- 优先发送 OGG/Opus 语音，兼容 Element X；设备不支持 Opus 时回退 AAC。
 - 接收端根据文件真实内容识别 OGG、AAC、M4A、MP3、WAV、FLAC、WebM、
   AMR 和 3GP，降低 MIME 或扩展名错误造成的播放失败。
 - 语音消息支持 AI 转文字、复制转录内容、展开和收起。
@@ -77,9 +77,9 @@ Office 文件点击后会在内嵌编辑器中打开，可下载编辑后的副�
 发送到当前聊天。编辑器地址通过 `officeEditorUrl` 配置；必须使用浏览器和手机
 都信任的 HTTPS 证书，并允许被 iframe/WebView 嵌入。
 
-Web 端支持直接录制语音。Chrome/Firefox 会发送浏览器实际生成的 WebM/Opus，
-Android/macOS 仍保持 OGG/Opus，避免把 WebM 错标成 OGG 后导致其他客户端无法
-播放。首次使用时需要允许站点访问麦克风。
+Web 端录制 PCM/WAV 后编码为 OGG/Opus；原生端优先录制 Opus，Apple 平台
+通过 CAF 转封装为 OGG，接收端兼容 OGG、WebM 和 CAF。设备不支持 Opus 时
+使用 AAC/M4A 回退并标注真实格式。首次使用时需要允许站点访问麦克风。
 
 ## Android
 
@@ -88,9 +88,9 @@ flutter build apk --release
 ```
 
 也可以在 GitHub 仓库的 Actions 页面手动运行 `Build Mobile Packages`，输入
-完整的 Cloudflare 转录接口地址和 Office 编辑器地址后下载测试 APK。该 APK
-使用调试签名，仅用于直接安装和功能测试；上架应用商店前必须配置自己的长期
-签名证书。
+完整的 Cloudflare 转录接口地址和 Office 编辑器地址后下载安装 APK。该工作流
+要求配置长期 Release 签名密钥，后续使用同一签名即可覆盖升级。Android 通过
+常驻 Matrix 同步接收消息，无需 Firebase 配置。
 
 手机端需要使用已部署的转录代理时，传入完整地址：
 
@@ -120,10 +120,7 @@ flutter build apk --release \
 聊天、贴纸、语音和文件等主程序功能，但系统分享扩展、通知内容解密和正式推送
 仍受苹果免费证书权限限制。未签名 IPA 不能直接安装，也不能提交 App Store。
 
-如果没有 Apple Developer 账号，iOS 侧载版仍可通过 ntfy 接收 Matrix 后台通知，
-并在点击通知时打开对应房间。需要先部署 Matrix 推送网关并安装 ntfy App；
-每台设备首次运行后，在 FluffyChat 的个人设置中复制该设备的专属主题，再到
-ntfy App 中订阅。详细步骤见 [iOS 侧载版 Matrix 推送](docs/ios-ntfy-push-zh.md)。
+iOS 侧载版目前没有额外的第三方后台通知方案，后续另行适配。
 
 ## Web
 

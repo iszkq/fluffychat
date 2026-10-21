@@ -73,13 +73,18 @@ class RecordingViewModelState extends State<RecordingViewModel> {
     setState(() {});
 
     try {
-      const codec = kIsWeb ? AudioEncoder.wav : AudioEncoder.opus;
+      var codec = kIsWeb ? AudioEncoder.wav : AudioEncoder.opus;
       if (!await audioRecorder.isEncoderSupported(codec)) {
-        throw const FormatException('Opus recording is not supported');
+        if (kIsWeb ||
+            !await audioRecorder.isEncoderSupported(AudioEncoder.aacLc)) {
+          throw const FormatException('Voice recording is not supported');
+        }
+        codec = AudioEncoder.aacLc;
       }
       final extension = kIsWeb
           ? 'wav'
-          : PlatformInfos.isIOS || PlatformInfos.isMacOS
+          : codec == AudioEncoder.opus &&
+                (PlatformInfos.isIOS || PlatformInfos.isMacOS)
           ? 'caf'
           : codec.fileExtension;
       fileName =
@@ -107,9 +112,11 @@ class RecordingViewModelState extends State<RecordingViewModel> {
           bitRate: AppSettings.audioRecordingBitRate.value,
           sampleRate: kIsWeb
               ? 48000
-              : _opusCompatibleSampleRate(
+              : codec == AudioEncoder.opus
+              ? _opusCompatibleSampleRate(
                   AppSettings.audioRecordingSamplingRate.value,
-                ),
+                )
+              : AppSettings.audioRecordingSamplingRate.value,
           numChannels: kIsWeb ? 1 : AppSettings.audioRecordingNumChannels.value,
           autoGain: AppSettings.audioRecordingAutoGain.value,
           echoCancel: AppSettings.audioRecordingEchoCancel.value,

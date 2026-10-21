@@ -37,11 +37,8 @@ Future<void> openOfficeDocument(BuildContext context, Event event) async {
   await Navigator.of(context, rootNavigator: true).push<void>(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) => OfficeEditorPage(
-        file: file,
-        room: event.room,
-        sourceEvent: event,
-      ),
+      builder: (_) =>
+          OfficeEditorPage(file: file, room: event.room, sourceEvent: event),
     ),
   );
 }
@@ -247,8 +244,7 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
 
   bool _matchesActiveSave(Map<String, Object?> message) {
     final saveId = message['saveId'];
-    return _activeSaveId != null &&
-        (saveId == null || saveId == _activeSaveId);
+    return _activeSaveId != null && (saveId == null || saveId == _activeSaveId);
   }
 
   Future<void> _finishSavedFile(Map<String, Object?> message) async {
@@ -300,16 +296,14 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
           extraContent: {
             officeEditMetadataKey: {
               'editor': editorName,
-              if (editorId != null) 'editor_id': editorId,
+              'editor_id': ?editorId,
               'updated_at': updatedAt.toUtc().toIso8601String(),
               'source_event_id': widget.sourceEvent.eventId,
             },
           },
         );
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
                 _sourceBelongsToCurrentUser
@@ -450,9 +444,7 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
                           height: 28,
                           child: VerticalDivider(
                             width: 1,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outlineVariant,
+                            color: Theme.of(context).colorScheme.outlineVariant,
                           ),
                         ),
                         _OfficeActionButton(
@@ -541,13 +533,9 @@ class _OfficeEditorPageState extends State<OfficeEditorPage> {
                             Navigator.of(context).pop();
                           }
                         },
-                        icon: Icon(
-                          _opened ? Icons.arrow_back : Icons.close,
-                        ),
+                        icon: Icon(_opened ? Icons.arrow_back : Icons.close),
                         label: Text(
-                          _opened
-                              ? _strings.backToDocument
-                              : _strings.close,
+                          _opened ? _strings.backToDocument : _strings.close,
                         ),
                       ),
                     ],
@@ -637,8 +625,7 @@ class _OfficeStrings {
   String get downloadCopy => zh ? '下载编辑后的副本' : 'Download edited copy';
   String get saveChanges => zh ? '保存并替换原文件' : 'Save and replace original';
   String get sendEditedCopy => zh ? '发送编辑后的副本' : 'Send edited copy';
-  String get updatedOriginal =>
-      zh ? '原文件已更新' : 'The original file was updated';
+  String get updatedOriginal => zh ? '原文件已更新' : 'The original file was updated';
   String get sentCopy => zh ? '编辑后的副本已发送' : 'Edited copy sent';
   String get unknownEditor => zh ? '编辑者' : 'Editor';
   String get backToDocument => zh ? '返回文档' : 'Back to document';
@@ -656,7 +643,8 @@ String _editedCopyName(
   final safeBase = _safeFileNamePart(rawBase, fallback: 'document');
   final safeEditor = _safeFileNamePart(editorName, fallback: 'editor');
   String twoDigits(int value) => value.toString().padLeft(2, '0');
-  final stamp = '${updatedAt.year.toString().padLeft(4, '0')}-'
+  final stamp =
+      '${updatedAt.year.toString().padLeft(4, '0')}-'
       '${twoDigits(updatedAt.month)}-${twoDigits(updatedAt.day)}_'
       '${twoDigits(updatedAt.hour)}-${twoDigits(updatedAt.minute)}';
   final suffix = '_${safeEditor}_$stamp';

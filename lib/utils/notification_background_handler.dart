@@ -121,11 +121,16 @@ Future<void> notificationTap(
   final payload = FluffyChatPushPayload.fromString(
     notificationResponse.payload ?? '',
   );
+  if (clients.isEmpty) return;
   final client =
       clients.firstWhereOrNull(
         (client) => client.clientName == payload.clientName,
       ) ??
-      clients.first;
+      ((payload.clientName?.isEmpty ?? true) ? clients.first : null);
+  if (client == null) {
+    Logs().w('Ignore notification for an unavailable account');
+    return;
+  }
 
   updateSummaryNotification(
     flutterLocalNotificationsPlugin: FlutterLocalNotificationsPlugin(),
@@ -150,11 +155,7 @@ Future<void> notificationTap(
             .waitForRoomInSync(roomId)
             .timeout(const Duration(seconds: 30));
       }
-      router.go(
-        client.getRoomById(roomId)?.membership == Membership.invite
-            ? '/rooms?client=${client.clientName}'
-            : '/rooms/$roomId?client=${client.clientName}',
-      );
+      router.go('/rooms/$roomId?client=${client.clientName}');
     case NotificationResponseType.selectedNotificationAction:
       final actionType = FluffyChatNotificationActions.values.singleWhereOrNull(
         (action) => action.name == notificationResponse.actionId,
@@ -198,11 +199,7 @@ Future<void> notificationTap(
         case FluffyChatNotificationActions.mute:
           await room.setPushRuleState(PushRuleState.mentionsOnly);
         case FluffyChatNotificationActions.open:
-          router?.go(
-            client.getRoomById(roomId)?.membership == Membership.invite
-                ? '/rooms?client=${client.clientName}'
-                : '/rooms/$roomId?client=${client.clientName}',
-          );
+          router?.go('/rooms/$roomId?client=${client.clientName}');
         case FluffyChatNotificationActions.enterCall:
           router?.go('/rooms/$roomId?client=${client.clientName}&action=call');
       }

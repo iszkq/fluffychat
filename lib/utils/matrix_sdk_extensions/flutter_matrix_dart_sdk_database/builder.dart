@@ -7,8 +7,10 @@ import 'dart:io';
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/client_manager.dart';
+import 'package:fluffychat/utils/database_recovery.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:matrix/matrix.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -37,13 +39,12 @@ Future<DatabaseApi> flutterMatrixSdkDatabaseBuilder(String clientName) async {
       Logs().e('Unable to send error notification', e, s);
     }
 
-    // Delete database file:
-    if (!kIsWeb) {
-      final dbFile = File(await _getDatabasePath(clientName));
-      if (await dbFile.exists()) await dbFile.delete();
-    }
-
-    // Try again
+    // Keychain, permission, plugin and migration errors must never erase a DB.
+    if (kIsWeb || !isRecoverableDatabaseCorruption(e)) rethrow;
+    final backup = await preserveCorruptDatabase(
+      await _getDatabasePath(clientName),
+    );
+    Logs().w('Preserved corrupt database before recovery', backup);
     return await _constructDatabase(clientName);
   }
 }
@@ -112,13 +113,31 @@ Future<MatrixSdkDatabase> _constructDatabase(String clientName) async {
     ),
   );
 
-  return await MatrixSdkDatabase.init(
-    clientName,
-    database: database,
-    maxFileSize: 1000 * 1000 * 10,
-    fileStorageLocation: fileStorageLocation?.uri,
-    deleteFilesAfterDuration: const Duration(days: 30),
-  );
+  // Match the existing session backup's private Keychain. This also works for
+  // sideloaded iOS builds without App Group entitlements. The SQLCipher key
+  // retains its separate shared/private migration for notification extensions.
+  const secureStorage = FlutterSecureStorage();
+  try {
+    return await MatrixSdkDatabase.init(
+      clientName,
+      database: database,
+      maxFileSize: 1000 * 1000 * 10,
+      fileStorageLocation: fileStorageLocation?.uri,
+      deleteFilesAfterDuration: const Duration(days: 30),
+      secureStorage: (
+        read: (key) => secureStorage.read(key: key),
+        write: (key, value) => secureStorage.write(key: key, value: value),
+        delete: (key) => secureStorage.delete(key: key),
+      ),
+    );
+  } catch (error, stackTrace) {
+    try {
+      await database.close();
+    } catch (closeError, closeStackTrace) {
+      Logs().w('Unable to close failed database', closeError, closeStackTrace);
+    }
+    Error.throwWithStackTrace(error, stackTrace);
+  }
 }
 
 Future<String> _getDatabaseDirectory() async {

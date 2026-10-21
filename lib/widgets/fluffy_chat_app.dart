@@ -4,11 +4,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:cupertino_ui/cupertino_ui.dart';
-import 'package:fluffychat/config/app_config.dart';
 import 'package:fluffychat/config/routes.dart';
 import 'package:fluffychat/config/setting_keys.dart';
 import 'package:fluffychat/config/themes.dart';
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/utils/deep_links.dart';
 import 'package:fluffychat/widgets/app_lock.dart';
 import 'package:fluffychat/widgets/layouts/call_overlay.dart';
 import 'package:fluffychat/widgets/theme_builder.dart';
@@ -54,32 +54,7 @@ class FluffyChatApp extends StatelessWidget {
         return '/';
       }
 
-      // Pass deep links to app:
-      if (state.uri.toString().startsWith(AppConfig.deepLinkPrefix)) {
-        return '/rooms/newprivatechat#${state.uri}';
-      }
-
-      if (state.uri.scheme == AppConfig.appOpenUrlScheme &&
-          state.uri.host == 'room') {
-        final roomId = Uri.decodeComponent(state.uri.pathSegments.join('/'));
-        if (roomId.isEmpty) return '/';
-
-        final queryParameters = <String, String>{};
-        final eventId = state.uri.queryParameters['event'];
-        final clientName = state.uri.queryParameters['client'];
-        if (eventId != null && eventId.isNotEmpty) {
-          queryParameters['event'] = eventId;
-        }
-        if (clientName != null && clientName.isNotEmpty) {
-          queryParameters['client'] = clientName;
-        }
-
-        return Uri(
-          path: '/rooms/$roomId',
-          queryParameters: queryParameters.isEmpty ? null : queryParameters,
-        ).toString();
-      }
-      return null;
+      return routeForDeepLink(state.uri);
     },
   );
 

@@ -2498,7 +2498,6 @@
     },
     "createNewChat": "新建聊天",
     "reset": "重置",
-    "supportFluffyChat": "支持 FluffyChat",
     "support": "支持",
     "setLowPriority": "设置低优先级",
     "unsetLowPriority": "取消设置低优先级",
@@ -2837,15 +2836,21 @@
     "forwardMessagesToChats": "将 {messageCount} 条消息转发到 {chatCount} 个聊天？",
     "@forwardMessagesToChats": {
         "placeholders": {
-            "messageCount": {"type": "int"},
-            "chatCount": {"type": "int"}
+            "messageCount": {
+                "type": "int"
+            },
+            "chatCount": {
+                "type": "int"
+            }
         }
     },
     "unableToForwardMessages": "无法准备要转发的消息。",
     "forwardMessagesFailedForChats": "有 {count} 个聊天转发失败，失败的聊天仍保持选中。",
     "@forwardMessagesFailedForChats": {
         "placeholders": {
-            "count": {"type": "int"}
+            "count": {
+                "type": "int"
+            }
         }
     },
     "voiceToText": "转文字",
@@ -2856,5 +2861,31 @@
     "collapse": "收起",
     "expand": "展开",
     "playbackSpeed": "播放速度",
-    "sharedLocation": "分享位置"
+    "sharedLocation": "分享位置",
+    "pasteImage": "粘贴图片",
+    "noImageInClipboard": "剪贴板中无图片",
+    "doYouAlsoWantToBlock": "是否同时屏蔽这位用户？",
+    "declineAndBlock": "拒绝并屏蔽",
+    "senderHasInvitedYouToTheChat": "{sender} 邀请你加入聊天“{nameOrAlias}”。",
+    "@senderHasInvitedYouToTheChat": {
+        "placeholders": {
+            "sender": {
+                "type": "String"
+            },
+            "nameOrAlias": {
+                "type": "String"
+            }
+        }
+    },
+    "senderHasInvitedYouToTheSpace": "{sender} 邀请你加入空间“{nameOrAlias}”。",
+    "@senderHasInvitedYouToTheSpace": {
+        "placeholders": {
+            "sender": {
+                "type": "String"
+            },
+            "nameOrAlias": {
+                "type": "String"
+            }
+        }
+    }
 }
