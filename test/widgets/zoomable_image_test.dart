@@ -133,7 +133,7 @@ void main() {
     expect(_transform(tester, 1), Matrix4.identity());
   });
 
-  testWidgets('a short edge drag returns to the same zoomed image', (
+  testWidgets('a short edge drag stays on the same zoomed image', (
     tester,
   ) async {
     final controller = await _gallery(tester);
@@ -143,7 +143,9 @@ void main() {
     await tester.pump();
     await gesture.moveBy(const Offset(-340, 0));
     await tester.pump();
-    expect(controller.page, greaterThan(0));
+    // Reaching the image edge alone must not start paging. The gesture needs
+    // to continue past the deliberate handoff distance first.
+    expect(controller.page, 0);
     await tester.pump(const Duration(milliseconds: 500));
     await gesture.up();
     await tester.pumpAndSettle();

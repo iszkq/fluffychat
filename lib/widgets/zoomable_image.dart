@@ -90,6 +90,10 @@ class _ZoomableImageState extends State<ZoomableImage>
   static const _maxScale = 10.0;
   static const _doubleTapScale = 2.5;
   static const _scaleTolerance = 0.01;
+  // Keep a small, deliberate handoff distance after the image reaches its
+  // horizontal boundary. This prevents a tiny clamp/rounding difference from
+  // handing the gesture to the pager while the user is still panning.
+  static const _pageHandoffDistance = 32.0;
   static const _animationDuration = Duration(milliseconds: 250);
 
   final _imageKey = GlobalKey();
@@ -109,6 +113,7 @@ class _ZoomableImageState extends State<ZoomableImage>
   bool _horizontalDrag = false;
   bool _dragDirectionDecided = false;
   Offset _gestureDistance = Offset.zero;
+  double _edgeOverflow = 0;
   Drag? _pageDrag;
   double _pageDragDistance = 0;
   ScrollHoldController? _pageHold;
@@ -264,6 +269,7 @@ class _ZoomableImageState extends State<ZoomableImage>
     _startScale = _scale;
     _previousFocalPoint = details.localFocalPoint;
     _gestureDistance = Offset.zero;
+    _edgeOverflow = 0;
     _horizontalDrag = false;
     _dragDirectionDecided = false;
   }
@@ -303,6 +309,7 @@ class _ZoomableImageState extends State<ZoomableImage>
         );
       });
       _previousFocalPoint = details.localFocalPoint;
+      _edgeOverflow = 0;
       return;
     }
 
@@ -323,7 +330,19 @@ class _ZoomableImageState extends State<ZoomableImage>
     // when the image has been shrunk back to its fitted size.
     if (!_hadMultiplePointers && _horizontalDrag) {
       final remaining = delta.dx - (offset.dx - previous.dx);
-      _dragPage(remaining, details);
+      if (remaining == 0) {
+        _edgeOverflow = 0;
+      } else if (_edgeOverflow == 0 || _edgeOverflow.sign == remaining.sign) {
+        _edgeOverflow += remaining;
+      } else {
+        _edgeOverflow = remaining;
+      }
+      if (_edgeOverflow.abs() >= _pageHandoffDistance) {
+        final handoff =
+            _edgeOverflow - _edgeOverflow.sign * _pageHandoffDistance;
+        _edgeOverflow = 0;
+        _dragPage(handoff, details);
+      }
     }
     _previousFocalPoint = details.localFocalPoint;
   }
@@ -334,6 +353,7 @@ class _ZoomableImageState extends State<ZoomableImage>
     final pageDrag = _pageDrag;
     if (pageDrag != null) {
       _pageDrag = null;
+      _edgeOverflow = 0;
       // Do not reuse a fast image pan's velocity when only a few pixels have
       // crossed the edge; that would accidentally fling to the next image.
       final velocity = _pageDragDistance.abs() > kTouchSlop * 2
