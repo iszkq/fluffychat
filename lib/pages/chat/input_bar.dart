@@ -58,8 +58,8 @@ class InputBar extends StatelessWidget {
   List<Map<String, String?>> getSuggestions(TextEditingValue text) {
     if (text.selection.baseOffset != text.selection.extentOffset ||
         text.selection.baseOffset < 0 ||
-        (text.composing.isValid && !text.composing.isCollapsed)) {
-      return []; // Wait for a collapsed cursor and committed IME text.
+        text.selection.baseOffset > text.text.length) {
+      return []; // no entries if there is selected text
     }
     final searchText = text.text.substring(0, text.selection.baseOffset);
     final ret = <Map<String, String?>>[];
