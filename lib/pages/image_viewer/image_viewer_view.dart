@@ -4,11 +4,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'package:fluffychat/l10n/l10n.dart';
-import 'package:fluffychat/pages/image_viewer/pointers_listener.dart';
 import 'package:fluffychat/pages/image_viewer/video_player.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/widgets/hover_builder.dart';
 import 'package:fluffychat/widgets/mxc_image.dart';
+import 'package:fluffychat/widgets/zoomable_image.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
 
@@ -97,57 +97,59 @@ class ImageViewerView extends StatelessWidget {
               KeyboardListener(
                 focusNode: controller.focusNode,
                 onKeyEvent: controller.onKeyEvent,
-                child: PointersListener(
-                  builder: (context, moreThanOnePointer) => PageView.builder(
-                    physics: !moreThanOnePointer
-                        ? BouncingScrollPhysics()
-                        : NeverScrollableScrollPhysics(),
+                child: ImageViewerGestureScope(
+                  child: PageView.builder(
+                    // ZoomableImage forwards only the drag left over at an image
+                    // boundary. PageView must not install a competing recognizer.
+                    physics: const NeverScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
                     scrollDirection: Axis.horizontal,
                     controller: controller.pageController,
                     itemCount: controller.allEvents.length,
                     onPageChanged: controller.onPageChanged,
                     itemBuilder: (context, i) {
                       final event = controller.allEvents[i];
-                      switch (event.messageType) {
-                        case MessageTypes.Video:
-                          return Padding(
+                      if (event.messageType == MessageTypes.Video) {
+                        return ZoomableImage(
+                          key: ValueKey(event.eventId),
+                          pageController: controller.pageController,
+                          pageIndex: i,
+                          zoomEnabled: false,
+                          child: Padding(
                             padding: const EdgeInsets.fromLTRB(12, 64, 12, 16),
-                            child: Center(
-                              child: GestureDetector(
-                                // Ignore taps to not go back here:
-                                onTap: () {},
-                                child: EventVideoPlayer(event),
-                              ),
+                            child: GestureDetector(
+                              // Ignore taps to not go back here:
+                              onTap: () {},
+                              child: EventVideoPlayer(event),
                             ),
-                          );
-                        case MessageTypes.Image:
-                        case MessageTypes.Sticker:
-                        default:
-                          return InteractiveViewer(
-                            minScale: 1.0,
-                            maxScale: 10.0,
-                            onInteractionEnd: controller.onInteractionEnds,
-                            child: Center(
-                              child: Hero(
-                                tag: event.eventId,
-                                child: GestureDetector(
-                                  // Ignore taps to not go back here:
-                                  onTap: () {},
-                                  child: RotatedBox(
-                                    quarterTurns: controller.rotationFor(event),
-                                    child: MxcImage(
-                                      key: ValueKey(event.eventId),
-                                      event: event,
-                                      fit: BoxFit.contain,
-                                      isThumbnail: false,
-                                      animated: true,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
+                          ),
+                        );
                       }
+                      return ZoomableImage(
+                        key: ValueKey(event.eventId),
+                        resetKey: controller.rotationFor(event),
+                        pageController: controller.pageController,
+                        pageIndex: i,
+                        onInteractionEnd: controller.onInteractionEnds,
+                        child: Hero(
+                          tag: event.eventId,
+                          child: GestureDetector(
+                            // Ignore taps to not go back here:
+                            onTap: () {},
+                            child: RotatedBox(
+                              quarterTurns: controller.rotationFor(event),
+                              child: MxcImage(
+                                key: ValueKey(event.eventId),
+                                event: event,
+                                fit: BoxFit.contain,
+                                isThumbnail: false,
+                                animated: true,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
                     },
                   ),
                 ),

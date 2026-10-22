@@ -50,7 +50,8 @@ jobs:
             test/deep_links_test.dart test/notification_launch_handler_test.dart \
             test/settings_reset_test.dart test/retire_legacy_ios_push_test.dart \
             test/database_recovery_test.dart test/rtc_discovery_test.dart \
-            test/update_notifier_test.dart
+            test/update_notifier_test.dart \
+            test/widgets/zoomable_image_test.dart
 
       - name: Configure stable release signing
         env:
@@ -142,6 +143,7 @@ jobs:
           test/database_recovery_test.dart
           test/rtc_discovery_test.dart
           test/update_notifier_test.dart
+          test/widgets/zoomable_image_test.dart
 
       - name: Build iOS app without signing
         env:
