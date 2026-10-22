@@ -5,11 +5,28 @@ import 'package:fluffychat/utils/matrix_sdk_extensions/room_mention_extension.da
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix/matrix.dart';
 
-class _MentionClient extends Client {
-  _MentionClient() : super('Room mention tests');
+class _MentionClient implements Client {
+  _MentionClient() {
+    registerDefaultCommands();
+  }
+
+  @override
+  final commands = <String, CommandExecutionCallback>{};
+
+  @override
+  final accountData = <String, BasicEvent>{};
 
   @override
   String get userID => '@sender:example.org';
+
+  @override
+  bool get convertLinebreaksInFormatting => true;
+
+  @override
+  bool get enableLatexMarkdown => true;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 // Use the real pinned SDK's command, Markdown and mention processing, capturing
@@ -56,7 +73,6 @@ class _MentionRoom extends Room {
 void main() {
   late _MentionRoom room;
   setUp(() => room = _MentionRoom());
-  tearDown(() => room.client.dispose());
 
   test('reproduces the SDK missing a room mention next to Chinese', () async {
     await room.sendTextEvent('@room请看');
