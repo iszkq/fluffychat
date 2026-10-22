@@ -65,7 +65,7 @@ abstract class PlatformInfos {
 
   static Future<void> showDialog(BuildContext context) async {
     final l10n = L10n.of(context);
-    final version = await PlatformInfos.getVersion(includeBuildNumber: true);
+    final version = await PlatformInfos.getVersion();
     if (!context.mounted) return;
     showAboutDialog(
       context: context,

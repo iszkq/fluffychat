@@ -30,7 +30,7 @@ abstract class UpdateNotifier {
           context: context,
           builder: (context) => AlertDialog.adaptive(
             title: Text(
-              l10n.updateInstalled(currentVersion),
+              l10n.updateInstalled(currentVersion.split('+').first),
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             content: Text(l10n.updateInstalledDescription),

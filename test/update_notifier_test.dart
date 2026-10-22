@@ -21,8 +21,8 @@ void main() {
     PackageInfo.setMockInitialValues(
       appName: 'FluffyChat',
       packageName: 'im.fluffychat.app',
-      version: '2.11.1',
-      buildNumber: '300037',
+      version: '3.0.1',
+      buildNumber: '300038',
       buildSignature: '',
     );
     await tester.pumpWidget(
@@ -54,16 +54,16 @@ void main() {
     tester,
   ) async {
     await openUpdate(tester);
-    expect(find.text('已更新至 2.11.1+300037'), findsNothing);
+    expect(find.text('已更新至 3.0.1'), findsNothing);
     final store = await SharedPreferences.getInstance();
-    expect(store.getString(UpdateNotifier.versionStoreKey), '2.11.1+300037');
+    expect(store.getString(UpdateNotifier.versionStoreKey), '3.0.1+300038');
   });
 
   testWidgets('same installed build does not show an update dialog', (
     tester,
   ) async {
-    await openUpdate(tester, previous: '2.11.1+300037');
-    expect(find.text('已更新至 2.11.1+300037'), findsNothing);
+    await openUpdate(tester, previous: '3.0.1+300038');
+    expect(find.text('已更新至 3.0.1'), findsNothing);
   });
 
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
@@ -71,8 +71,8 @@ void main() {
       tester,
     ) async {
       // Migrate an existing installation that only recorded the version.
-      await openUpdate(tester, previous: '2.11.1', platform: platform);
-      expect(find.text('已更新至 2.11.1+300037'), findsOneWidget);
+      await openUpdate(tester, previous: '3.0.1', platform: platform);
+      expect(find.text('已更新至 3.0.1'), findsOneWidget);
       expect(find.textContaining('iszkq/fluffychat'), findsOneWidget);
       expect(find.text('更新记录'), findsOneWidget);
       expect(find.text('关闭'), findsOneWidget);
@@ -82,14 +82,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Check update'));
       await tester.pumpAndSettle();
-      expect(find.text('已更新至 2.11.1+300037'), findsNothing);
+      expect(find.text('已更新至 3.0.1'), findsNothing);
     });
   }
 
   testWidgets('a new build of the same version shows an update', (
     tester,
   ) async {
-    await openUpdate(tester, previous: '2.11.1+300036');
-    expect(find.text('已更新至 2.11.1+300037'), findsOneWidget);
+    await openUpdate(tester, previous: '3.0.1+300037');
+    expect(find.text('已更新至 3.0.1'), findsOneWidget);
   });
 }

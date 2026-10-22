@@ -157,7 +157,10 @@ class InputBar extends StatelessWidget {
         }
       }
     }
-    final userMatch = RegExp(r'(?:\s|^)@([-\w]+)$').firstMatch(searchText);
+    final userMatch = RegExp(
+      r'(?:\s|^)@([\p{L}\p{N}_-]+)$',
+      unicode: true,
+    ).firstMatch(searchText);
     if (userMatch != null) {
       final userSearch = userMatch[1]!.toLowerCase();
       for (final user in room.getParticipants()) {
@@ -373,7 +376,7 @@ class InputBar extends StatelessWidget {
     if (suggestion['type'] == 'user') {
       insertText = '${suggestion['mention']!} ';
       startText = replaceText.replaceAllMapped(
-        RegExp(r'(\s|^)(@[-\w]+)$'),
+        RegExp(r'(\s|^)(@[\p{L}\p{N}_-]+)$', unicode: true),
         (Match m) => '${m[1]}$insertText',
       );
     }

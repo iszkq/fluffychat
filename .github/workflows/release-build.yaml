@@ -1,0 +1,226 @@
+# SPDX-FileCopyrightText: 2026 Contributors to FluffyChat
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: Build and Publish Release Packages
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing vX.Y.Z tag to build and publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  android:
+    name: Android APK and AAB
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: ./.github/actions/free_up_space
+        with:
+          target: android
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos --no-fatal-warnings lib
+          flutter test --timeout 2m test/update_notifier_test.dart
+      - name: Configure release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          for variable in ANDROID_KEYSTORE_BASE64 ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD ANDROID_STORE_PASSWORD; do
+            test -n "${!variable}" || { echo "Missing ${variable}"; exit 1; }
+          done
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+          {
+            printf 'storePassword=%s\n' "$ANDROID_STORE_PASSWORD"
+            printf 'keyPassword=%s\n' "$ANDROID_KEY_PASSWORD"
+            printf 'keyAlias=%s\n' "$ANDROID_KEY_ALIAS"
+            printf 'storeFile=release.keystore\n'
+          } > android/key.properties
+      - name: Build Android packages
+        run: |
+          build_number=$((300000 + GITHUB_RUN_NUMBER))
+          version="${RELEASE_TAG#v}"
+          flutter build apk --release --build-name="${version}" --build-number=${build_number} --target-platform android-arm,android-arm64
+          flutter build appbundle --release --build-name="${version}" --build-number=${build_number}
+          cp build/app/outputs/flutter-apk/app-release.apk fluffychat-3.0.1-android.apk
+          cp build/app/outputs/bundle/release/app-release.aab fluffychat-3.0.1-android.aab
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android
+          path: fluffychat-3.0.1-android.*
+
+  ios:
+    name: iOS unsigned and SideStore IPA
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.2.app
+          brew install sqlcipher
+          flutter config --enable-swift-package-manager
+          flutter pub get
+      - name: Build and package IPA files
+        run: |
+          build_number=$((300000 + GITHUB_RUN_NUMBER))
+          version="${RELEASE_TAG#v}"
+          flutter build ios --release --no-codesign --build-name="${version}" --build-number=${build_number}
+          mkdir -p build/unsigned/Payload build/sideload/Payload
+          cp -R build/ios/iphoneos/Runner.app build/unsigned/Payload/
+          cp -R build/ios/iphoneos/Runner.app build/sideload/Payload/
+          rm -rf build/sideload/Payload/Runner.app/PlugIns
+          (cd build/unsigned && zip -qry ../../fluffychat-3.0.1-ios-unsigned.ipa Payload)
+          (cd build/sideload && zip -qry ../../fluffychat-3.0.1-ios-sideload.ipa Payload)
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios
+          path: '*.ipa'
+
+  macos:
+    name: macOS app
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - run: brew install sqlcipher && flutter pub get
+      - run: |
+          build_number=$((300000 + GITHUB_RUN_NUMBER))
+          version="${RELEASE_TAG#v}"
+          flutter build macos --release --build-name="${version}" --build-number=${build_number}
+      - run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/FluffyChat.app fluffychat-3.0.1-macos.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: '*.zip'
+
+  windows:
+    name: Windows app
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - run: flutter pub get
+      - run: |
+          $version = $env:RELEASE_TAG.TrimStart('v')
+          $buildNumber = 300000 + [int]$env:GITHUB_RUN_NUMBER
+          flutter build windows --release --build-name=$version --build-number=$buildNumber
+      - run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath fluffychat-3.0.1-windows.zip
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: '*.zip'
+
+  linux:
+    name: Linux app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libblkid-dev liblzma-dev libjsoncpp-dev libsecret-1-dev libsecret-1-0 librhash0 libwebkit2gtk-4.1-dev libpulse-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - run: flutter pub get
+      - run: flutter build linux --release
+      - run: tar -czf fluffychat-3.0.1-linux-x64.tar.gz -C build/linux/x64/release bundle
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux
+          path: '*.tar.gz'
+
+  web:
+    name: Web package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Web toolchain helpers
+        run: |
+          rustup toolchain install nightly-x86_64-unknown-linux-gnu --profile minimal --component rust-src
+          curl --fail --silent --show-error --location https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 --output "$RUNNER_TEMP/yq"
+          chmod +x "$RUNNER_TEMP/yq"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Prepare and build web
+        run: |
+          flutter config --enable-web --no-analytics
+          flutter pub get
+          ./scripts/prepare-web.sh
+          flutter build web --release --dart-define=FLUTTER_WEB_CANVASKIT_URL=canvaskit/
+          cp config.sample.json build/web/config.json
+          tar -czf fluffychat-3.0.1-web.tar.gz -C build web
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web
+          path: '*.tar.gz'
+
+  publish:
+    name: Publish GitHub Release
+    needs: [android, ios, macos, windows, linux, web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="docs/releases/${RELEASE_TAG}.md"
+          test -f "$notes"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --title "FluffyChat ${RELEASE_TAG#v}" --notes-file "$notes"
+          else
+            gh release create "$RELEASE_TAG" --title "FluffyChat ${RELEASE_TAG#v}" --notes-file "$notes"
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
