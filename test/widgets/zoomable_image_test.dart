@@ -122,15 +122,11 @@ void main() {
     await tester.pump();
     await gesture.moveBy(const Offset(-80, 0));
     await tester.pump();
-    expect(controller.page, 0);
-    expect(_transform(tester).getMaxScaleOnAxis(), 2.5);
-    await gesture.moveBy(const Offset(-220, 0));
-    // Once the image is at its edge, crossing the handoff distance starts the
-    // pager while preserving the same continuous drag.
-    await gesture.moveBy(const Offset(-40, 0));
-    await tester.pump();
     expect(controller.page, greaterThan(0));
     expect(controller.page, lessThan(0.5));
+    expect(_transform(tester).getMaxScaleOnAxis(), 2.5);
+    await gesture.moveBy(const Offset(-220, 0));
+    await tester.pump();
     await gesture.up();
     await tester.pumpAndSettle();
     expect(controller.page, 1);
@@ -147,14 +143,61 @@ void main() {
     await tester.pump();
     await gesture.moveBy(const Offset(-290, 0));
     await tester.pump();
-    // Reaching the image edge alone must not start paging. The gesture needs
-    // to continue past the deliberate handoff distance first.
-    expect(controller.page, lessThan(0.05));
+    expect(controller.page, 0);
     await tester.pump(const Duration(milliseconds: 500));
     await gesture.up();
     await tester.pumpAndSettle();
     expect(controller.page, 0);
     expect(_transform(tester).getMaxScaleOnAxis(), 2.5);
+  });
+
+  for (final direction in [-1.0, 1.0]) {
+    testWidgets('paging waits for edge overflow in direction $direction', (
+      tester,
+    ) async {
+      final controller = await _gallery(tester, initialPage: 1);
+      await _doubleTap(tester);
+      final gesture = await tester.startGesture(const Offset(200, 400));
+      await gesture.moveBy(Offset(direction * 30, 0));
+      await tester.pump();
+      final transform = _transform(tester, 1);
+      final boundary = direction < 0
+          ? 400 * (1 - transform.getMaxScaleOnAxis())
+          : 0.0;
+      await gesture.moveBy(Offset(boundary - transform.entry(0, 3), 0));
+      await tester.pump();
+      expect(_transform(tester, 1).entry(0, 3), boundary);
+      expect(controller.page, 1);
+      await gesture.moveBy(Offset(direction * 31, 0));
+      await tester.pump();
+      expect(controller.page, 1);
+      await gesture.moveBy(Offset(direction * 50, 0));
+      await tester.pump();
+      expect((controller.page! - 1).abs(), greaterThan(0));
+      await tester.pump(const Duration(milliseconds: 500));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(controller.page, 1);
+    });
+  }
+
+  testWidgets('fractional image pans stay responsive without moving pages', (
+    tester,
+  ) async {
+    final controller = await _gallery(tester, initialPage: 1);
+    await _doubleTap(tester);
+    final gesture = await tester.startGesture(const Offset(200, 400));
+    await gesture.moveBy(const Offset(-30, 0));
+    await tester.pump();
+    final start = _transform(tester, 1).entry(0, 3);
+    for (var i = 0; i < 100; i++) {
+      await gesture.moveBy(const Offset(-0.3, 0));
+      await tester.pump();
+    }
+    expect(_transform(tester, 1).entry(0, 3), closeTo(start - 30, 0.000001));
+    expect(controller.page, 1);
+    await gesture.up();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('an inward drag at the edge pans instead of paging', (
