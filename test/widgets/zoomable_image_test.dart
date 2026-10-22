@@ -122,11 +122,15 @@ void main() {
     await tester.pump();
     await gesture.moveBy(const Offset(-80, 0));
     await tester.pump();
-    expect(controller.page, greaterThan(0));
-    expect(controller.page, lessThan(0.5));
+    expect(controller.page, 0);
     expect(_transform(tester).getMaxScaleOnAxis(), 2.5);
     await gesture.moveBy(const Offset(-220, 0));
+    // Once the image is at its edge, crossing the handoff distance starts the
+    // pager while preserving the same continuous drag.
+    await gesture.moveBy(const Offset(-40, 0));
     await tester.pump();
+    expect(controller.page, greaterThan(0));
+    expect(controller.page, lessThan(0.5));
     await gesture.up();
     await tester.pumpAndSettle();
     expect(controller.page, 1);
