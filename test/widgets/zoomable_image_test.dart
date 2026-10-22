@@ -185,16 +185,18 @@ void main() {
     tester,
   ) async {
     final controller = await _gallery(tester, initialPage: 1);
-    await _doubleTap(tester);
+    await _doubleTap(tester, const Offset(300, 400));
     final gesture = await tester.startGesture(const Offset(200, 400));
+    await gesture.moveBy(const Offset(-30, 0));
+    await tester.pump();
     await gesture.moveBy(const Offset(-30, 0));
     await tester.pump();
     final start = _transform(tester, 1).entry(0, 3);
     for (var i = 0; i < 100; i++) {
-      await gesture.moveBy(const Offset(-0.3, 0));
+      await gesture.moveBy(const Offset(-0.1, 0));
       await tester.pump();
     }
-    expect(_transform(tester, 1).entry(0, 3), closeTo(start - 30, 0.000001));
+    expect(_transform(tester, 1).entry(0, 3), closeTo(start - 10, 0.000001));
     expect(controller.page, 1);
     await gesture.up();
     await tester.pumpAndSettle();
