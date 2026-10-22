@@ -145,7 +145,7 @@ void main() {
     final gesture = await tester.startGesture(const Offset(350, 400));
     await gesture.moveBy(const Offset(-30, 0));
     await tester.pump();
-    await gesture.moveBy(const Offset(-340, 0));
+    await gesture.moveBy(const Offset(-290, 0));
     await tester.pump();
     // Reaching the image edge alone must not start paging. The gesture needs
     // to continue past the deliberate handoff distance first.
