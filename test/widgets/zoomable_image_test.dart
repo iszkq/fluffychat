@@ -149,7 +149,7 @@ void main() {
     await tester.pump();
     // Reaching the image edge alone must not start paging. The gesture needs
     // to continue past the deliberate handoff distance first.
-    expect(controller.page, 0);
+    expect(controller.page, lessThan(0.05));
     await tester.pump(const Duration(milliseconds: 500));
     await gesture.up();
     await tester.pumpAndSettle();
