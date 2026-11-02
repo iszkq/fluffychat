@@ -7,12 +7,14 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:fluffychat/l10n/l10n.dart';
+import 'package:fluffychat/utils/qr_login/qr_login_payload.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
 
 class QrScannerModal extends StatefulWidget {
   final void Function(String) onScan;
-  const QrScannerModal({required this.onScan, super.key});
+  final void Function(QrLoginPayload)? onLoginScan;
+  const QrScannerModal({required this.onScan, this.onLoginScan, super.key});
 
   @override
   QrScannerModalState createState() => QrScannerModalState();
@@ -21,14 +23,24 @@ class QrScannerModal extends StatefulWidget {
 class QrScannerModalState extends State<QrScannerModal> {
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   QRViewController? controller;
+  StreamSubscription<Barcode>? _subscription;
+  bool _handled = false;
+  bool _invalidShown = false;
+
+  @override
+  void dispose() {
+    unawaited(_subscription?.cancel());
+    // QRView owns and disposes its platform controller.
+    super.dispose();
+  }
 
   @override
   void reassemble() {
     super.reassemble();
     if (Platform.isAndroid) {
-      controller!.pauseCamera();
+      controller?.pauseCamera();
     } else if (Platform.isIOS) {
-      controller!.resumeCamera();
+      controller?.resumeCamera();
     }
   }
 
@@ -68,13 +80,37 @@ class QrScannerModalState extends State<QrScannerModal> {
       controller.pauseCamera();
     }
     controller.resumeCamera();
-    late StreamSubscription sub;
-    sub = controller.scannedDataStream.listen((scanData) {
-      sub.cancel();
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      final data = scanData.code;
-      if (data != null) widget.onScan(data);
+    unawaited(_subscription?.cancel());
+    _subscription = controller.scannedDataStream.listen((scanData) {
+      if (!mounted || _handled) return;
+      QrLoginPayload? login;
+      try {
+        login = QrLoginPayload.fromScan(
+          text: scanData.code,
+          rawBytes: scanData.rawBytes,
+        );
+      } on FormatException {
+        if (!_invalidShown) {
+          _invalidShown = true;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(L10n.of(context).qrLoginInvalidCode)),
+          );
+        }
+        return;
+      }
+      final onLogin = widget.onLoginScan;
+      final text = scanData.code;
+      if (login != null && onLogin != null) {
+        _handled = true;
+        unawaited(_subscription?.cancel());
+        Navigator.of(context).pop();
+        onLogin(login);
+      } else if (login == null && text != null && text.isNotEmpty) {
+        _handled = true;
+        unawaited(_subscription?.cancel());
+        Navigator.of(context).pop();
+        widget.onScan(text);
+      }
     });
   }
 }

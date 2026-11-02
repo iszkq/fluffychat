@@ -21,8 +21,28 @@ permissions:
   contents: read
 
 jobs:
+  qr_login_checks:
+    name: QR login protocol and UI checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Install offline interoperability peer dependencies
+        run: npm install --prefix "$RUNNER_TEMP/qr-login-peer" --no-audit --no-fund --ignore-scripts matrix-js-sdk@45.0.0 qrcode@1.5.4
+      - name: Validate unchanged protocol and dialog sources
+        run: |
+          flutter pub get
+          python3 scripts/validate_qr_login.py --flutter "$(command -v flutter)" --js-project "$RUNNER_TEMP/qr-login-peer"
+
   android_apk:
     name: Android background-sync APK
+    needs: qr_login_checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -100,6 +120,7 @@ jobs:
 
   ios_unsigned_ipa:
     name: iOS unsigned IPA
+    needs: qr_login_checks
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7

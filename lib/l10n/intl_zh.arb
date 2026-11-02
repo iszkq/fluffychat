@@ -2888,5 +2888,27 @@
             }
         }
     },
-    "updateInstalledDescription": "当前使用 iszkq/fluffychat 定制版。更新记录中可查看本分支的改进和已知问题。"
+    "updateInstalledDescription": "当前使用 iszkq/fluffychat 定制版。更新记录中可查看本分支的改进和已知问题。",
+    "qrLoginTitle": "登录新设备",
+    "qrLoginUnlockHint": "请使用恢复密钥或备份口令，在手机本地解锁加密密钥。这不是账号登录密码，输入内容不会发送给新设备或服务器。",
+    "qrLoginConsent": "请确认刚才扫描的是你要登录的设备上的二维码。继续后，该设备将获得此账号的访问权限和加密密钥。",
+    "qrLoginContinue": "继续",
+    "qrLoginConnecting": "正在建立安全连接…",
+    "qrLoginCompareCode": "请核对手机与新设备上的校验码。只有两边一致时才继续，新设备上也需要确认。",
+    "qrLoginCodesMatch": "校验码一致",
+    "qrLoginAuthorizationHint": "打开服务器的授权页面，允许新设备登录。请使用上方显示的账号。如果浏览器尚未登录，服务器可能要求先登录账号。",
+    "qrLoginOpenAuthorization": "打开授权页面",
+    "qrLoginWaiting": "请在浏览器中完成授权后返回，正在等待新设备登录…",
+    "qrLoginSharing": "正在安全传递加密密钥…",
+    "qrLoginSuccess": "已完成授权和密钥传递，新设备可以继续进入聊天。历史消息能否解密取决于手机或备份中是否保存了对应密钥。",
+    "qrLoginDevice": "新设备：{deviceId}",
+    "qrLoginKeysLocked": "手机尚未验证，或加密密钥未解锁。请先在安全设置中恢复密钥，再重新扫码。",
+    "qrLoginExpired": "登录请求已过期，请在新设备上生成二维码后重新扫描。",
+    "qrLoginCancelled": "登录请求已取消或被拒绝。",
+    "qrLoginUnsupported": "服务器不支持此扫码登录协议，请在新设备上使用其他登录方式。",
+    "qrLoginWrongAccount": "此账号下未找到新设备，或手机账号已切换，未传递加密密钥。请检查浏览器授权时使用的账号。",
+    "qrLoginBrowserFailed": "无法打开授权页面，请启用浏览器后重试。",
+    "qrLoginSecurityError": "登录安全检查失败，请取消并重新生成二维码。",
+    "qrLoginNetworkError": "扫码登录未完成，请检查网络，并重新生成二维码后重试。",
+    "qrLoginInvalidCode": "登录二维码无效或格式暂不支持，请扫描新设备上重新生成的登录码。"
 }

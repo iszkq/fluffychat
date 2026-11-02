@@ -2877,5 +2877,28 @@
             }
         }
     },
-    "updateInstalledDescription": "This is the iszkq/fluffychat edition. View our release notes for changes and known issues."
+    "updateInstalledDescription": "This is the iszkq/fluffychat edition. View our release notes for changes and known issues.",
+    "qrLoginTitle": "Log in on another device",
+    "qrLoginUnlockHint": "Unlock encryption keys on this phone with your recovery key or backup passphrase. This is checked locally; it is not your account password and is not sent to the new device or the server.",
+    "qrLoginConsent": "Only continue if you scanned a QR code on a device you want to log in to. This will give that device access to your account and encryption keys.",
+    "qrLoginContinue": "Continue",
+    "qrLoginConnecting": "Establishing a secure connection…",
+    "qrLoginCompareCode": "Compare this code with the one on the other device. Continue only if both codes match. Confirm on the other device as well.",
+    "qrLoginCodesMatch": "The codes match",
+    "qrLoginAuthorizationHint": "Open your server’s authorization page and approve the new device. Use the account shown above. Your browser may ask you to sign in if it has no active session.",
+    "qrLoginOpenAuthorization": "Open authorization page",
+    "qrLoginWaiting": "Complete approval in your browser, then return here. Waiting for the new device to log in…",
+    "qrLoginSharing": "Securely transferring encryption keys…",
+    "qrLoginSuccess": "Authorization and key transfer completed. The other device can finish logging in. Older messages require their keys to be available on the phone or in the backup.",
+    "qrLoginDevice": "New device: {deviceId}",
+    "@qrLoginDevice": {"placeholders": {"deviceId": {"type": "String"}}},
+    "qrLoginKeysLocked": "This phone is not verified or its encryption keys are locked. Restore your keys in Security settings, then scan again.",
+    "qrLoginExpired": "The login request has expired. Generate a new QR code on the other device and scan again.",
+    "qrLoginCancelled": "The login request was cancelled or declined.",
+    "qrLoginUnsupported": "Your server does not support this QR login protocol. Use another login method on the new device.",
+    "qrLoginWrongAccount": "The new device was not found under this account, or the phone’s account changed. No encryption keys were transferred. Check the account used for browser authorization.",
+    "qrLoginBrowserFailed": "Could not open the authorization page. Try again after enabling a browser.",
+    "qrLoginSecurityError": "The login security check failed. Cancel this request and generate a new QR code.",
+    "qrLoginNetworkError": "Could not complete QR login. Check your connection and generate a new QR code to retry.",
+    "qrLoginInvalidCode": "This login QR code is invalid or uses an unsupported format. Scan a fresh login code displayed on the new device."
 }

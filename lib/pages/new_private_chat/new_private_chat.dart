@@ -8,10 +8,13 @@ import 'dart:async';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/new_private_chat/new_private_chat_view.dart';
+import 'package:fluffychat/pages/new_private_chat/qr_login_dialog.dart';
 import 'package:fluffychat/pages/new_private_chat/qr_scanner_modal.dart';
 import 'package:fluffychat/utils/adaptive_bottom_sheet.dart';
 import 'package:fluffychat/utils/fluffy_share.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
+import 'package:fluffychat/utils/qr_login/matrix_qr_login_account.dart';
+import 'package:fluffychat/utils/qr_login/qr_login_existing_device.dart';
 import 'package:fluffychat/utils/url_launcher.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:flutter/services.dart';
@@ -103,6 +106,19 @@ class NewPrivateChatController extends State<NewPrivateChat> {
       context: context,
       builder: (_) => QrScannerModal(
         onScan: (link) => UrlLauncher(context, link).openMatrixToUrl(),
+        onLoginScan: (payload) {
+          if (mounted) {
+            unawaited(
+              QrLoginDialog.show(
+                context,
+                QrLoginExistingDevice(
+                  account: MatrixQrLoginAccount(Matrix.of(context).client),
+                  payload: payload,
+                ),
+              ),
+            );
+          }
+        },
       ),
     );
   }
