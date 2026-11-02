@@ -16,6 +16,15 @@ on:
         required: true
         default: https://124.222.193.241:6258
         type: string
+      package_target:
+        description: Mobile package to build
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - android
+          - ios
 
 permissions:
   contents: read
@@ -42,6 +51,7 @@ jobs:
 
   android_apk:
     name: Android background-sync APK
+    if: inputs.package_target != 'ios'
     needs: qr_login_checks
     runs-on: ubuntu-latest
     steps:
@@ -120,6 +130,7 @@ jobs:
 
   ios_unsigned_ipa:
     name: iOS unsigned IPA
+    if: inputs.package_target != 'android'
     needs: qr_login_checks
     runs-on: macos-15
     steps:
