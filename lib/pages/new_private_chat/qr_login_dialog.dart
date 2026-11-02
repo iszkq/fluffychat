@@ -216,7 +216,10 @@ class _QrLoginDialogState extends State<QrLoginDialog> {
       _Stage.authorize => l10n.qrLoginAuthorizationHint,
       _Stage.waiting => l10n.qrLoginWaiting,
       _Stage.sharing => l10n.qrLoginSharing,
-      _Stage.done => l10n.qrLoginSuccess,
+      _Stage.done =>
+        widget.flow.needsDeviceVerification
+            ? l10n.qrLoginVerifyOnDesktop
+            : l10n.qrLoginSuccess,
       _Stage.error => _errorText(l10n),
     };
     return AlertDialog.adaptive(

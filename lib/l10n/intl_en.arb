@@ -2900,5 +2900,6 @@
     "qrLoginBrowserFailed": "Could not open the authorization page. Try again after enabling a browser.",
     "qrLoginSecurityError": "The login security check failed. Cancel this request and generate a new QR code.",
     "qrLoginNetworkError": "Could not complete QR login. Check your connection and generate a new QR code to retry.",
-    "qrLoginInvalidCode": "This login QR code is invalid or uses an unsupported format. Scan a fresh login code displayed on the new device."
+    "qrLoginInvalidCode": "This login QR code is invalid or uses an unsupported format. Scan a fresh login code displayed on the new device.",
+    "qrLoginVerifyOnDesktop": "The account is signed in on the desktop. Close this dialog, accept device verification on both devices, and compare the emoji. Available keys will be shared after verification; no keys have been transferred yet."
 }

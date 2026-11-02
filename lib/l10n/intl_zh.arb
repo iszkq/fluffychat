@@ -2910,5 +2910,6 @@
     "qrLoginBrowserFailed": "无法打开授权页面，请启用浏览器后重试。",
     "qrLoginSecurityError": "登录安全检查失败，请取消并重新生成二维码。",
     "qrLoginNetworkError": "扫码登录未完成，请检查网络，并重新生成二维码后重试。",
-    "qrLoginInvalidCode": "登录二维码无效或格式暂不支持，请扫描新设备上重新生成的登录码。"
+    "qrLoginInvalidCode": "登录二维码无效或格式暂不支持，请扫描新设备上重新生成的登录码。",
+    "qrLoginVerifyOnDesktop": "账号已在电脑登录。请关闭此窗口，在电脑和手机上接受设备验证并核对图形。验证通过后会共享可用密钥；当前尚未完成密钥传递。"
 }

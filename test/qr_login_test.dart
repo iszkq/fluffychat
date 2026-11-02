@@ -102,7 +102,83 @@ class FakeChannel extends Msc4108Channel {
   Future<Map<String, Object?>> receive() async => incoming.removeAt(0);
 }
 
+class HandoffAccount extends FakeAccount {
+  @override
+  String get deviceId => 'SYNTHETIC_PHONE';
+  @override
+  bool get supportsVerificationHandoff => true;
+}
+
 void main() {
+  test(
+    'missing master seed hands off to SAS after authentication, without recovery input or key export',
+    () async {
+      final account = HandoffAccount()..hasKeys = false;
+      final channel = FakeChannel([
+        {...protocol(), 'org.mxchat.device_verification': 1},
+        {'type': 'm.login.success'},
+      ]);
+      final flow = QrLoginExistingDevice(
+        account: account,
+        payload: QrLoginPayload.fromBytes(payloadBytes()),
+        channel: channel,
+      );
+      await flow.run(
+        unlockSecrets: () async =>
+            fail('Recovery must not be required for SAS'),
+        confirmCode: (_) async => true,
+        authorize: (_, _) async {
+          account.exists = true;
+          return true;
+        },
+        onSharingSecrets: () => fail('No secret transfer happened'),
+      );
+      expect(flow.needsDeviceVerification, isTrue);
+      expect(account.exports, 0);
+      expect(channel.sent.last['org.mxchat.device_verification'], {
+        'user_id': account.userId,
+        'device_id': account.deviceId,
+      });
+      expect(channel.sent.last.containsKey('cross_signing'), isFalse);
+    },
+  );
+  test(
+    'clients without handoff capability retain recovery and the full secrets bundle',
+    () async {
+      final account = HandoffAccount()..hasKeys = false;
+      final channel = FakeChannel([
+        protocol(),
+        {'type': 'm.login.success'},
+      ]);
+      final flow = QrLoginExistingDevice(
+        account: account,
+        payload: QrLoginPayload.fromBytes(payloadBytes()),
+        channel: channel,
+      );
+      var unlocks = 0;
+      await flow.run(
+        unlockSecrets: () async {
+          unlocks++;
+          account.hasKeys = true;
+          return true;
+        },
+        confirmCode: (_) async => true,
+        authorize: (_, _) async {
+          account.exists = true;
+          return true;
+        },
+        onSharingSecrets: () {},
+      );
+      expect(unlocks, 1);
+      expect(account.exports, 1);
+      expect(flow.needsDeviceVerification, isFalse);
+      expect(channel.sent.last.containsKey('cross_signing'), isTrue);
+      expect(
+        channel.sent.last.containsKey('org.mxchat.device_verification'),
+        isFalse,
+      );
+    },
+  );
   test('normal Matrix contact and room scans stay on original route', () {
     for (final link in [
       'https://matrix.to/#/@alice:example.org',
@@ -380,141 +456,163 @@ void main() {
   });
 
   final sdkProject = Platform.environment['QR_LOGIN_JS_PROJECT'];
-  test(
-    'interoperates with real matrix-js-sdk / Rust ECIES, DAG and secrets flow',
-    () async {
-      final peer = await Process.start('node', [
-        'scripts/qr_login_test_peer.mjs',
-        sdkProject!,
-      ]);
-      final lines = StreamIterator(
-        peer.stdout.transform(utf8.decoder).transform(const LineSplitter()),
-      );
-      final stderr = StringBuffer();
-      final stderrSub = peer.stderr
-          .transform(utf8.decoder)
-          .listen(stderr.write);
-      Future<Map<String, Object?>> next() async {
-        if (!await lines.moveNext().timeout(const Duration(seconds: 20))) {
-          fail('Peer ended: $stderr');
-        }
-        return jsonDecode(lines.current) as Map<String, Object?>;
-      }
-
-      Future<Map<String, Object?>> rpc(Map<String, Object?> command) async {
-        peer.stdin.writeln(jsonEncode(command));
-        return next();
-      }
-
-      try {
-        final init = await next();
-        final bytes = base64Decode(init['qr'] as String);
-        final payload = QrLoginPayload.fromScan(
-          rawBytes: List<int>.from(init['raw8'] as List),
-        )!;
-        expect(payload.publicKey, bytes.sublist(8, 40));
-        expect(
-          QrLoginPayload.fromScan(
-            rawBytes: List<int>.from(init['raw16'] as List),
-          )!.publicKey,
-          payload.publicKey,
+  for (final handoff in [false, true]) {
+    test(
+      'interoperates with real matrix-js-sdk / Rust ECIES, DAG and ${handoff ? "SAS handoff" : "secrets"} flow',
+      () async {
+        final peer = await Process.start('node', [
+          'scripts/qr_login_test_peer.mjs',
+          sdkProject!,
+          if (handoff) '--handoff',
+        ]);
+        final lines = StreamIterator(
+          peer.stdout.transform(utf8.decoder).transform(const LineSplitter()),
         );
-        var pending = Future<void>.value();
-        // Serialize test RPCs; production transport is sequential too.
-        Future<Map<String, Object?>> serial(Map<String, Object?> request) {
-          final result = pending.then((_) => rpc(request));
-          pending = result.then((_) {});
-          return result;
+        final stderr = StringBuffer();
+        final stderrSub = peer.stderr
+            .transform(utf8.decoder)
+            .listen(stderr.write);
+        Future<Map<String, Object?>> next() async {
+          if (!await lines.moveNext().timeout(const Duration(seconds: 20))) {
+            fail('Peer ended: $stderr');
+          }
+          return jsonDecode(lines.current) as Map<String, Object?>;
         }
 
-        final client = MockClient((request) async {
-          expect(request.headers.containsKey('authorization'), isFalse);
-          if (request.method == 'GET') {
-            final data = await serial({'command': 'get'});
-            if (request.headers['if-none-match'] == data['etag']) {
-              return http.Response('', 304);
+        Future<Map<String, Object?>> rpc(Map<String, Object?> command) async {
+          peer.stdin.writeln(jsonEncode(command));
+          return next();
+        }
+
+        try {
+          final init = await next();
+          final bytes = base64Decode(init['qr'] as String);
+          final payload = QrLoginPayload.fromScan(
+            rawBytes: List<int>.from(init['raw8'] as List),
+          )!;
+          expect(payload.publicKey, bytes.sublist(8, 40));
+          expect(
+            QrLoginPayload.fromScan(
+              rawBytes: List<int>.from(init['raw16'] as List),
+            )!.publicKey,
+            payload.publicKey,
+          );
+          var pending = Future<void>.value();
+          // Serialize test RPCs; production transport is sequential too.
+          Future<Map<String, Object?>> serial(Map<String, Object?> request) {
+            final result = pending.then((_) => rpc(request));
+            pending = result.then((_) {});
+            return result;
+          }
+
+          final client = MockClient((request) async {
+            expect(request.headers.containsKey('authorization'), isFalse);
+            if (request.method == 'GET') {
+              final data = await serial({'command': 'get'});
+              if (request.headers['if-none-match'] == data['etag']) {
+                return http.Response('', 304);
+              }
+              return http.Response(
+                data['body'] as String,
+                200,
+                headers: {
+                  'etag': data['etag'] as String,
+                  'content-type': 'text/plain',
+                },
+              );
             }
+            final data = await serial({
+              'command': 'put',
+              'body': request.body,
+              'etag': request.headers['if-match'],
+            });
             return http.Response(
-              data['body'] as String,
-              200,
+              '',
+              data['status'] as int,
               headers: {
-                'etag': data['etag'] as String,
-                'content-type': 'text/plain',
+                if (data['etag'] != null) 'etag': data['etag'] as String,
               },
             );
-          }
-          final data = await serial({
-            'command': 'put',
-            'body': request.body,
-            'etag': request.headers['if-match'],
           });
-          return http.Response(
-            '',
-            data['status'] as int,
-            headers: {if (data['etag'] != null) 'etag': data['etag'] as String},
-          );
-        });
-        final account = _PeerAccount(() => serial({'command': 'status'}));
-        final flow = QrLoginExistingDevice(
-          account: account,
-          payload: payload,
-          channel: Msc4108Channel(
-            Msc4108Transport(
-              payload.rendezvous,
-              httpClient: client,
-              pollInterval: const Duration(milliseconds: 10),
+          final account = _PeerAccount(
+            () => serial({'command': 'status'}),
+            handoff: handoff,
+          )..hasKeys = !handoff;
+          final flow = QrLoginExistingDevice(
+            account: account,
+            payload: payload,
+            channel: Msc4108Channel(
+              Msc4108Transport(
+                payload.rendezvous,
+                httpClient: client,
+                pollInterval: const Duration(milliseconds: 10),
+              ),
             ),
-          ),
-        );
-        await flow.run(
-          confirmCode: (code) async {
-            final status = await serial({'command': 'status'});
-            expect(code, status['checkCode']);
-            return true;
-          },
-          authorize: (uri, deviceId) async {
+          );
+          await flow.run(
+            confirmCode: (code) async {
+              final status = await serial({'command': 'status'});
+              expect(code, status['checkCode']);
+              return true;
+            },
+            authorize: (uri, deviceId) async {
+              expect(
+                uri.toString(),
+                'https://auth.example/verify?user_code=TEST',
+              );
+              expect(deviceId, 'SYNTHETIC_NEW_DEVICE');
+              await serial({'command': 'approve'});
+              return true;
+            },
+            onSharingSecrets: () {},
+          );
+          Map<String, Object?> status;
+          do {
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+            status = await serial({'command': 'status'});
+            expect(status['failure'], isNull);
+          } while (status['finished'] == null);
+          final finished = status['finished'] as Map;
+          expect(finished['serverName'], 'example.org');
+          expect(finished['tokenReceived'], isTrue);
+          final secrets = finished['secrets'] as Map;
+          if (handoff) {
+            expect(secrets['org.mxchat.device_verification'], {
+              'user_id': account.userId,
+              'device_id': account.deviceId,
+            });
+            expect(secrets.containsKey('cross_signing'), isFalse);
+            expect(account.exports, 0);
+          } else {
             expect(
-              uri.toString(),
-              'https://auth.example/verify?user_code=TEST',
+              (secrets['cross_signing'] as Map)['master_key'],
+              'synthetic-master',
             );
-            expect(deviceId, 'SYNTHETIC_NEW_DEVICE');
-            await serial({'command': 'approve'});
-            return true;
-          },
-          onSharingSecrets: () {},
-        );
-        Map<String, Object?> status;
-        do {
-          await Future<void>.delayed(const Duration(milliseconds: 10));
-          status = await serial({'command': 'status'});
-          expect(status['failure'], isNull);
-        } while (status['finished'] == null);
-        final finished = status['finished'] as Map;
-        expect(finished['serverName'], 'example.org');
-        expect(finished['tokenReceived'], isTrue);
-        final secrets = finished['secrets'] as Map;
-        expect(
-          (secrets['cross_signing'] as Map)['master_key'],
-          'synthetic-master',
-        );
-        expect((secrets['backup'] as Map)['backup_version'], '1');
-        expect(account.exports, 1);
-      } finally {
-        peer.kill();
-        await lines.cancel();
-        await stderrSub.cancel();
-      }
-    },
-    skip: sdkProject == null
-        ? 'Set QR_LOGIN_JS_PROJECT to a project with matrix-js-sdk and qrcode installed'
-        : false,
-    timeout: const Timeout(Duration(seconds: 60)),
-  );
+            expect((secrets['backup'] as Map)['backup_version'], '1');
+            expect(account.exports, 1);
+          }
+        } finally {
+          peer.kill();
+          await lines.cancel();
+          await stderrSub.cancel();
+        }
+      },
+      skip: sdkProject == null
+          ? 'Set QR_LOGIN_JS_PROJECT to a project with matrix-js-sdk and qrcode installed'
+          : false,
+      timeout: const Timeout(Duration(seconds: 60)),
+    );
+  }
 }
 
 class _PeerAccount extends FakeAccount {
   final Future<Map<String, Object?>> Function() status;
-  _PeerAccount(this.status);
+  final bool handoff;
+  _PeerAccount(this.status, {this.handoff = false});
+  @override
+  String get deviceId => 'SYNTHETIC_PHONE';
+  @override
+  bool get supportsVerificationHandoff => handoff;
   @override
   Future<bool> deviceExists(String deviceId) async =>
       (await status())['newDeviceLoggedIn'] == true;

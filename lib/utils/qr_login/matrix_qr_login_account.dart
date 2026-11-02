@@ -16,6 +16,10 @@ class MatrixQrLoginAccount extends QrLoginAccount {
   @override
   final String userId;
   final String? _deviceId;
+  @override
+  String? get deviceId => _deviceId;
+  @override
+  bool get supportsVerificationHandoff => true;
   String? _masterKey;
   bool _triedSecureStorage = false;
   bool _cleared = false;
@@ -62,6 +66,11 @@ class MatrixQrLoginAccount extends QrLoginAccount {
     await client.accountDataLoading;
     await client.userDeviceKeysLoading;
     final encryption = client.encryption;
+    // Some clients may have explicitly cached this seed, although Dart SDK's
+    // default cacheTypes omit it. Validate it before use during export.
+    _masterKey ??= await encryption?.ssss.getCached(
+      EventTypes.CrossSigningMasterKey,
+    );
     // The SDK deliberately doesn't cache the master seed. Reuse only the
     // recovery key the user already chose to keep in OS secure storage.
     if (encryption != null && _masterKey == null && !_triedSecureStorage) {
@@ -194,6 +203,7 @@ class MatrixQrLoginAccount extends QrLoginAccount {
         if (info.algorithm.name == 'm.megolm_backup.v1.curve25519-aes-sha2' &&
             derived == info.authData['public_key']) {
           result['backup'] = {
+            'algorithm': info.algorithm.name,
             'key': backup.replaceAll('=', ''),
             'backup_version': info.version,
           };

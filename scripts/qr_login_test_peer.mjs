@@ -26,7 +26,11 @@ const session = {
   },
   async close() {},
 };
-const channel = new MSC4108SecureChannel(session);
+const handoff = process.argv.includes('--handoff');
+class CapableChannel extends MSC4108SecureChannel {
+  secureSend(payload) { return super.secureSend(payload.type === 'm.login.protocol' ? { ...payload, 'org.mxchat.device_verification': 1 } : payload); }
+}
+const channel = handoff ? new CapableChannel(session) : new MSC4108SecureChannel(session);
 const flow = new MSC4108SignInWithQR(channel, false);
 await flow.generateCode();
 const qrcode = requireSdk('qrcode');

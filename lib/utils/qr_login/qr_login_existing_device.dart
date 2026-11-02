@@ -12,6 +12,8 @@ class QrLoginAuthMetadata {
 
 abstract class QrLoginAccount {
   String get userId;
+  String? get deviceId => null;
+  bool get supportsVerificationHandoff => false;
   Future<QrLoginAuthMetadata> authMetadata();
   Future<void> ensureSecretsAvailable();
   Future<bool> deviceExists(String deviceId);
@@ -33,6 +35,7 @@ class QrLoginExistingDevice {
   final Duration deviceWait;
   final Duration devicePollInterval;
   bool _started = false;
+  bool needsDeviceVerification = false;
 
   QrLoginExistingDevice({
     required this.account,
@@ -64,14 +67,21 @@ class QrLoginExistingDevice {
           const Duration(seconds: 20),
         );
       } on QrLoginException catch (error) {
-        if (error.reason != 'keys_locked' || unlockSecrets == null) rethrow;
-        if (!await unlockSecrets()) {
-          throw const QrLoginException('user_cancelled');
+        if (error.reason != 'keys_locked') rethrow;
+        if (account.supportsVerificationHandoff && account.deviceId != null) {
+          // This app-to-app handoff does not claim key transfer succeeded.
+          // The new device must run standard Matrix SAS + Olm secret sharing.
+          needsDeviceVerification = true;
+        } else {
+          if (unlockSecrets == null) rethrow;
+          if (!await unlockSecrets()) {
+            throw const QrLoginException('user_cancelled');
+          }
+          channel.transport.checkActive();
+          await account.ensureSecretsAvailable().timeout(
+            const Duration(seconds: 20),
+          );
         }
-        channel.transport.checkActive();
-        await account.ensureSecretsAvailable().timeout(
-          const Duration(seconds: 20),
-        );
       }
       await channel.connect(payload.publicKey);
       final separator = account.userId.indexOf(':');
@@ -99,6 +109,21 @@ class QrLoginExistingDevice {
           deviceId.length > 255 ||
           grant is! Map<String, Object?>) {
         throw const QrLoginException('unexpected_message_received');
+      }
+      // Only mxchat versions explicitly advertising this extension can accept
+      // a login without the complete MSC4108 secrets bundle. Preserve the
+      // recovery/export path for all other Matrix clients.
+      if (needsDeviceVerification &&
+          request['org.mxchat.device_verification'] != 1) {
+        needsDeviceVerification = false;
+        if (unlockSecrets == null) throw const QrLoginException('keys_locked');
+        if (!await unlockSecrets()) {
+          throw const QrLoginException('user_cancelled');
+        }
+        channel.transport.checkActive();
+        await account.ensureSecretsAvailable().timeout(
+          const Duration(seconds: 20),
+        );
       }
       final verification = grant['verification_uri'];
       final complete = grant['verification_uri_complete'];
@@ -148,6 +173,16 @@ class QrLoginExistingDevice {
         await Future<void>.delayed(devicePollInterval);
       }
       channel.transport.checkActive();
+      if (needsDeviceVerification) {
+        await channel.send({
+          'type': 'm.login.secrets',
+          'org.mxchat.device_verification': {
+            'user_id': account.userId,
+            'device_id': account.deviceId,
+          },
+        });
+        return;
+      }
       onSharingSecrets();
       final secrets = await account.exportSecrets().timeout(
         const Duration(seconds: 20),
