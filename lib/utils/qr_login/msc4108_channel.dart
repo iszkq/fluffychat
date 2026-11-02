@@ -55,7 +55,9 @@ class Msc4108Transport {
     request.headers['accept'] = 'text/plain';
     if (method == 'PUT') {
       request.headers['content-type'] = 'text/plain';
-      request.body = body!;
+      // Request.body adds charset=utf-8 to text/* headers. Synapse's MSC4108
+      // endpoint requires exactly text/plain, so encode without changing it.
+      request.bodyBytes = utf8.encode(body!);
       request.headers['if-match'] = _etag!;
     } else if (_etag != null) {
       request.headers['if-none-match'] = _etag!;

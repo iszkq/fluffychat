@@ -26,6 +26,7 @@
 - 暂未实现 MSC4388 新格式，以及未登录手机扫描已登录设备显示二维码的反向登录流程。不能把所有 Matrix 二维码都视作此登录协议。
 - 认证服务必须支持 OAuth 设备授权（device authorization grant）。服务器和设备使用 HTTPS；不绕过证书验证。
 - Rendezvous 不携带手机的访问令牌、不跟随重定向，使用 ETag 做条件读写并限制消息大小及等待时间。
+- Rendezvous PUT 使用 `bodyBytes = utf8.encode(...)` 保留严格的 `Content-Type: text/plain`。Dart 的 `Request.body` 会自动添加 `charset=utf-8`，Synapse 会以 `400 M_INVALID_PARAM / Content-Type must be text/plain` 拒绝，导致扫码在握手前失败；刷新二维码不能修复此请求头问题。需安装包含此修复的新手机包。
 - 安全通道使用 X25519、HKDF-SHA512、方向独立的 ChaCha20-Poly1305 密钥和 nonce，与 vodozemac 实际实现互通。
 - 授权链接的 origin 必须匹配当前手机账号服务器公布的 issuer。用户明确核对校验码后才能打开授权。
 - 新设备 ID 在授权前必须不存在，授权后必须可从当前账号查询到，防止浏览器选错账号后分享密钥。

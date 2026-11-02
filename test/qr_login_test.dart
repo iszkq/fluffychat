@@ -425,6 +425,38 @@ void main() {
       expect(account.exports, 0);
     },
   );
+  test(
+    'rendezvous writes exact text/plain with UTF-8 bytes and conditional ETag',
+    () async {
+      final methods = <String>[];
+      final transport = Msc4108Transport(
+        Uri.parse('https://rendezvous.example/session/test'),
+        httpClient: MockClient((request) async {
+          methods.add(request.method);
+          expect(request.followRedirects, isFalse);
+          expect(request.headers.containsKey('authorization'), isFalse);
+          if (request.method == 'GET') {
+            return http.Response(
+              '',
+              200,
+              headers: {'etag': '"initial"', 'content-type': 'text/plain'},
+            );
+          }
+          // Synapse rejects text/plain; charset=utf-8 with M_INVALID_PARAM.
+          expect(request.headers['content-type'], 'text/plain');
+          expect(request.headers['if-match'], '"initial"');
+          expect(request.bodyBytes, utf8.encode('握手 synthetic'));
+          return http.Response('', 202, headers: {'etag': '"written"'});
+        }),
+      );
+      try {
+        await transport.send('握手 synthetic');
+        expect(methods, ['GET', 'PUT']);
+      } finally {
+        transport.close();
+      }
+    },
+  );
   test('rendezvous never follows redirects or sends a bearer token', () async {
     final transport = Msc4108Transport(
       Uri.parse('https://rendezvous.example/session/test'),
@@ -521,6 +553,7 @@ void main() {
                 },
               );
             }
+            expect(request.headers['content-type'], 'text/plain');
             final data = await serial({
               'command': 'put',
               'body': request.body,
