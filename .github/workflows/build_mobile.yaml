@@ -132,7 +132,9 @@ jobs:
     name: iOS unsigned IPA
     if: inputs.package_target != 'android'
     needs: qr_login_checks
-    runs-on: macos-15
+    # Pin Intel capacity: the generic macos-15 label uses ARM64, which can
+    # fail to acquire a hosted runner before any build step starts.
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v7
 
