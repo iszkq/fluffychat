@@ -167,6 +167,9 @@ jobs:
         run: plutil -lint ios/Runner.xcodeproj/project.pbxproj ios/Runner/Info.plist
 
       - name: Verify camera and voice playback regressions
+        # These tests already run in the Linux job. On macOS x64, webcrypto
+        # 0.6.1's host-only BoringSSL target has an upstream missing ADX symbol.
+        if: runner.arch != 'X64'
         run: >-
           flutter test --timeout 2m
           test/ios_camera_test.dart
