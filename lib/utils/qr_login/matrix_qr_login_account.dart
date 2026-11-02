@@ -42,7 +42,13 @@ class MatrixQrLoginAccount extends QrLoginAccount {
     _checkAccount();
     GetAuthMetadataResponse metadata;
     try {
-      metadata = await client.getAuthMetadata();
+      // QR authorization must trust this account's CURRENT homeserver. The SDK
+      // normally caches auth_metadata for three days (and can reuse it after a
+      // failed refresh), which can reject a valid grant after an issuer change.
+      metadata = await client.getAuthMetadata(
+        cacheLifetime: Duration.zero,
+        throwOnUpdateFailure: true,
+      );
     } on MatrixException catch (error) {
       if (!['M_UNRECOGNIZED', 'M_NOT_FOUND'].contains(error.errcode)) rethrow;
       metadata = GetAuthMetadataResponse.fromJson(

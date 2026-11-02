@@ -27,6 +27,7 @@ const session = {
   async close() {},
 };
 const handoff = process.argv.includes('--handoff');
+const manualCode = process.argv.includes('--manual-code');
 class CapableChannel extends MSC4108SecureChannel {
   secureSend(payload) { return super.secureSend(payload.type === 'm.login.protocol' ? { ...payload, 'org.mxchat.device_verification': 1 } : payload); }
 }
@@ -48,7 +49,7 @@ globalThis.fetch = async (url, options) => {
   if (target === 'https://auth.example/device') {
     return Response.json({ device_code: 'synthetic-device-code', user_code: 'TEST',
       verification_uri: 'https://auth.example/verify',
-      verification_uri_complete: 'https://auth.example/verify?user_code=TEST',
+      ...(manualCode ? {} : { verification_uri_complete: 'https://auth.example/verify?user_code=TEST' }),
       expires_in: 60, interval: 0.01 });
   }
   if (target === 'https://auth.example/token') {

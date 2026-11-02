@@ -31,10 +31,12 @@ files = [
     'lib/utils/qr_login/qr_login_payload.dart',
     'lib/utils/qr_login/msc4108_channel.dart',
     'lib/utils/qr_login/qr_login_existing_device.dart',
+    'lib/utils/qr_login/matrix_qr_login_account.dart',
     'lib/pages/new_private_chat/qr_login_dialog.dart',
     'lib/widgets/adaptive_dialogs/adaptive_dialog_action.dart',
     'lib/config/app_config.dart',
     'test/qr_login_test.dart',
+    'test/qr_login_account_test.dart',
     'test/qr_login_dialog_test.dart',
     'scripts/qr_login_test_peer.mjs',
 ]
@@ -61,6 +63,8 @@ dependencies:
   intl: 0.20.3
   cryptography: 2.9.0
   http: 1.6.0
+  matrix: 14.1.0
+  flutter_secure_storage: 11.2.0
   url_launcher: 6.3.3
 dev_dependencies:
   flutter_test:
@@ -72,6 +76,6 @@ flutter:
 env = os.environ.copy()
 if args.js_project:
     env['QR_LOGIN_JS_PROJECT'] = str(Path(args.js_project).resolve())
-for command in [['pub', 'get'], ['test', '--no-pub', '--reporter', 'expanded', 'test/qr_login_test.dart', 'test/qr_login_dialog_test.dart']]:
+for command in [['pub', 'get'], ['test', '--no-pub', '--reporter', 'expanded', 'test/qr_login_test.dart', 'test/qr_login_dialog_test.dart', 'test/qr_login_account_test.dart']]:
     subprocess.run([args.flutter, *command], cwd=target, env=env, check=True)
 print(f'QR login validation passed. Source hashes: {target / "source-sha256.json"}')
