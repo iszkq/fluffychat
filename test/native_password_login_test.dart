@@ -132,22 +132,14 @@ void main() {
     (tester) async {
       final client = _LoginClient();
       final matrix = _Matrix(client);
+      final snapshots = <AsyncSnapshot<bool>>[];
       final router = GoRouter(
         initialLocation: '/home',
         routes: [
           GoRoute(
             path: '/home',
-            builder: (context, _) => Scaffold(
-              body: TextButton(
-                onPressed: () => connectToHomeserverFlow(
-                  PublicHomeserverData(name: 'example.org'),
-                  context,
-                  (_) {},
-                  false,
-                ),
-                child: const Text('connect-server'),
-              ),
-            ),
+            builder: (context, _) =>
+                const Scaffold(body: Text('connect-server')),
           ),
           GoRoute(
             path: '/home/login',
@@ -171,9 +163,28 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('connect-server'));
+      // HTTP response streams use real asynchronous work. Await the production
+      // discovery/routing flow outside the widget test's virtual clock.
+      await tester.runAsync(
+        () => connectToHomeserverFlow(
+          PublicHomeserverData(name: 'example.org'),
+          tester.element(find.text('connect-server')),
+          snapshots.add,
+          false,
+        ),
+      );
       await tester.pumpAndSettle();
-      expect(find.byType(Login), findsOneWidget);
+      expect(
+        snapshots.last.hasError,
+        isFalse,
+        reason: '${snapshots.last.error}',
+      );
+      expect(
+        find.byType(Login),
+        findsOneWidget,
+        reason:
+            'route=${router.routeInformationProvider.value.uri}, snapshots=$snapshots',
+      );
       expect(find.byType(TextField), findsNWidgets(2));
       final controller = tester.state<LoginController>(find.byType(Login));
       controller.usernameController.text = '@alice:example.org';
