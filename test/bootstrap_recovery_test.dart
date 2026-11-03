@@ -232,9 +232,7 @@ void main() {
       client.encryption.ssss.onSecretStored.add(
         EventTypes.CrossSigningSelfSigning,
       );
-      await tester.pump();
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
       expect(router.routeInformationProvider.value.uri.path, '/rooms');
       expect(find.text('rooms-ready'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());

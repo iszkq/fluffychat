@@ -172,8 +172,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.tap(find.text('connect-server'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
       expect(find.byType(Login), findsOneWidget);
       expect(find.byType(TextField), findsNWidgets(2));
       final controller = tester.state<LoginController>(find.byType(Login));
@@ -185,8 +184,7 @@ void main() {
       expect(controller.loading, isFalse);
       client.reject = false;
       await controller.login();
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
       expect(find.text('recovery-ready'), findsOneWidget);
       expect(client.calls, [
         LoginType.mLoginPassword,
