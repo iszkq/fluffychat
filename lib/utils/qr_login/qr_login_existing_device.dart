@@ -16,6 +16,9 @@ abstract class QrLoginAccount {
   String get userId;
   String? get deviceId => null;
   bool get supportsVerificationHandoff => false;
+  bool get supportsCachedSecrets => false;
+  Future<Map<String, Object?>> exportCachedSecrets(String newDeviceId) async =>
+      throw const QrLoginException('keys_locked');
   Future<QrLoginAuthMetadata> authMetadata();
   Future<void> ensureSecretsAvailable();
   Future<bool> deviceExists(String deviceId);
@@ -235,6 +238,7 @@ class QrLoginExistingDevice {
       'protocols': ['org.mxchat.password.v1'],
       'user_id': account.userId,
       'homeserver': account.userId.substring(separator + 1),
+      if (account.supportsCachedSecrets) 'org.mxchat.cached_secrets': 1,
     });
     final request = await channel.receive();
     final deviceId = request['device_id'];
@@ -275,6 +279,18 @@ class QrLoginExistingDevice {
       await Future<void>.delayed(devicePollInterval);
     }
     onSharingSecrets();
+    if (account.supportsCachedSecrets &&
+        request['org.mxchat.cached_secrets'] == 1) {
+      final secrets = await account
+          .exportCachedSecrets(deviceId)
+          .timeout(const Duration(seconds: 20));
+      channel.transport.checkActive();
+      await channel.send({
+        'type': 'm.login.secrets',
+        'org.mxchat.cached_secrets': secrets,
+      });
+      return;
+    }
     try {
       final secrets = await account.exportSecrets().timeout(
         const Duration(seconds: 20),

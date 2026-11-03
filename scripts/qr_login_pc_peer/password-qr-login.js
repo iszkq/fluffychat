@@ -50,7 +50,8 @@ export async function completePasswordQrLogin(context, { signal, onStage }) {
         !sameLoginHomeserver(await resolve(hello.homeserver), baseUrl)) throw new Error('手机账号的服务器与填写的服务器不一致，请取消后重新填写');
     signal.throwIfAborted();
     const deviceId = `MXCHAT_${crypto.randomUUID().replaceAll('-', '').slice(0, 20)}`;
-    await channel.secureSend({ type: 'org.mxchat.login.request', protocol: 'org.mxchat.password.v1', device_id: deviceId });
+    await channel.secureSend({ type: 'org.mxchat.login.request', protocol: 'org.mxchat.password.v1', device_id: deviceId,
+      ...(hello['org.mxchat.cached_secrets'] === 1 ? { 'org.mxchat.cached_secrets': 1 } : {}) });
     let credentials = receiveFailure(await channel.secureReceive());
     if (credentials?.type !== 'org.mxchat.login.credentials' || credentials.user_id !== userId ||
         typeof credentials.password !== 'string' || !credentials.password || credentials.password.length > 16384) throw new Error('手机没有提供有效的登录凭据');
@@ -80,7 +81,11 @@ export async function completePasswordQrLogin(context, { signal, onStage }) {
     if (secrets?.type !== 'm.login.secrets') throw new Error('手机没有提供有效的密钥信息');
     const handoff = secrets['org.mxchat.device_verification'];
     let shared;
-    if (handoff) {
+    const cached = secrets['org.mxchat.cached_secrets'];
+    if (hello['org.mxchat.cached_secrets'] === 1) {
+      if (!cached || cached.version !== 1 || cached.user_id !== userId || cached.device_id !== deviceId) throw new Error('手机共享密钥与当前登录设备不匹配');
+      shared = { qrBootstrap: cached };
+    } else if (handoff) {
       if (handoff.user_id !== userId || typeof handoff.device_id !== 'string' ||
           !handoff.device_id || handoff.device_id.length > 255 || handoff.device_id === deviceId) throw new Error('手机设备验证信息与当前账号不匹配');
       shared = { deviceVerification: { userId, deviceId: handoff.device_id } };
@@ -97,6 +102,14 @@ export async function completePasswordQrLogin(context, { signal, onStage }) {
     throw Object.assign(new Error(error.errcode ? '服务器未能完成账号登录' : error.message), code ? { code } : {});
   } finally {
     // A cancelled/failed handoff must not leave an orphaned PC login behind.
-    if (tokens?.access_token && !finished) await loginClient?.logout().catch(() => {});
+    if (tokens?.access_token && !finished) {
+      // Revoke only a token confirmed to belong to our new PC device. A bad
+      // server response or mismatched whoami must not log out another device.
+      try {
+        const identity = await loginClient.whoami();
+        if (identity.user_id === tokens.user_id && identity.device_id === tokens.device_id &&
+            tokens.device_id?.startsWith('MXCHAT_')) await loginClient.logout();
+      } catch { /* Device management can revoke an orphan if the server is unavailable. */ }
+    }
   }
 }

@@ -1,8 +1,9 @@
 {
-  "source": "https://github.com/iszkq/mxchat",
-  "version": "0.3.11",
-  "sha256": {
-    "src/password-qr-login.js": "2cb602170e07491f95bf129708f521e2cc8bcb7806b1a1866ba53071b18cf17e",
-    "src/login-config.js": "dc0c855765dfb6405026a7e87f969c0b14a888089ca459feb6762cec26c15f54"
+  "version": "0.3.12",
+  "files": {
+    "src/password-qr-login.js": "ddaee2998e5e83d7148eafe40007718eda16c5f5b99e57791a5b761e539bba96",
+    "src/login-config.js": "dc0c855765dfb6405026a7e87f969c0b14a888089ca459feb6762cec26c15f54",
+    "src/qr-key-recovery.js": "ec0a02af09bd4a4212c346304c8f30c122009c2c4df12cc0031bdf6f8801b9cc",
+    "tests/qr-key-recovery.test.js": "7b4dce39a9041bcaf3d4681579aa996e8a1661f94ccbddc54ad12f2be437ff06"
   }
 }

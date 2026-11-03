@@ -22,6 +22,8 @@ class MatrixQrLoginAccount extends QrLoginAccount {
   String? get deviceId => _deviceId;
   @override
   bool get supportsVerificationHandoff => true;
+  @override
+  bool get supportsCachedSecrets => true;
   String? _masterKey;
   bool _triedSecureStorage = false;
   bool _cleared = false;
@@ -230,6 +232,85 @@ class MatrixQrLoginAccount extends QrLoginAccount {
         }
       } on MatrixException catch (error) {
         if (error.errcode != 'M_NOT_FOUND') rethrow;
+      }
+    }
+    _checkAccount();
+    return result;
+  }
+
+  /// QR consent authenticates the destination. Export only the already cached
+  /// signing/backup secrets; the master seed is neither needed nor persisted.
+  @override
+  Future<Map<String, Object?>> exportCachedSecrets(String newDeviceId) async {
+    _checkAccount();
+    await client.accountDataLoading;
+    await client.userDeviceKeysLoading;
+    final encryption = client.encryption;
+    final public = client.userDeviceKeys[userId];
+    final master = public?.masterKey?.ed25519Key;
+    if (encryption == null ||
+        !encryption.crossSigning.isSelfSigned ||
+        master == null) {
+      throw const QrLoginException('keys_locked');
+    }
+    final result = <String, Object?>{
+      'version': 1,
+      'user_id': userId,
+      'device_id': newDeviceId,
+      'master_key': master,
+    };
+    for (final entry in {
+      'self_signing_key': (
+        EventTypes.CrossSigningSelfSigning,
+        public?.selfSigningKey?.ed25519Key,
+      ),
+      'user_signing_key': (
+        EventTypes.CrossSigningUserSigning,
+        public?.userSigningKey?.ed25519Key,
+      ),
+    }.entries) {
+      final value = await encryption.ssss.getCached(entry.value.$1);
+      if (value == null) throw const QrLoginException('keys_locked');
+      final seed = base64Decode(base64.normalize(value));
+      try {
+        if (seed.length != 32) throw const QrLoginException('keys_locked');
+        final key = await Ed25519().newKeyPairFromSeed(seed);
+        final derived = base64Encode(
+          (await key.extractPublicKey()).bytes,
+        ).replaceAll('=', '');
+        if (derived != entry.value.$2) {
+          throw const QrLoginException('keys_locked');
+        }
+        result[entry.key] = {
+          'public_key': derived,
+          'private_key': value.replaceAll('=', ''),
+        };
+      } finally {
+        seed.fillRange(0, seed.length, 0);
+      }
+    }
+    final backup = await encryption.ssss.getCached(EventTypes.MegolmBackup);
+    if (backup != null) {
+      final seed = base64Decode(base64.normalize(backup));
+      try {
+        if (seed.length != 32) throw const QrLoginException('keys_locked');
+        final info = await client.getRoomKeysVersionCurrent();
+        final key = await X25519().newKeyPairFromSeed(seed);
+        final derived = base64Encode(
+          (await key.extractPublicKey()).bytes,
+        ).replaceAll('=', '');
+        if (info.algorithm.name != 'm.megolm_backup.v1.curve25519-aes-sha2' ||
+            derived != info.authData['public_key']) {
+          throw const QrLoginException('keys_locked');
+        }
+        result['backup'] = {
+          'key': backup.replaceAll('=', ''),
+          'backup_version': info.version,
+        };
+      } on MatrixException catch (error) {
+        if (error.errcode != 'M_NOT_FOUND') rethrow;
+      } finally {
+        seed.fillRange(0, seed.length, 0);
       }
     }
     _checkAccount();

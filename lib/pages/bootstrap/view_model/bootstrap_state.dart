@@ -9,6 +9,7 @@ import 'package:matrix/matrix.dart';
 class BootstrapViewModelState {
   String? recoveryKey;
   bool isLoading = false;
+  bool isRefreshingDevices = false;
   Object? unlockWithError;
   Object? recoveryError;
   ({

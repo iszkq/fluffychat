@@ -30,6 +30,7 @@ const session = {
 const handoff = process.argv.includes('--handoff');
 const manualCode = process.argv.includes('--manual-code');
 const passwordLogin = process.argv.includes('--password');
+const cached = process.argv.includes('--cached');
 class CapableChannel extends MSC4108SecureChannel {
   secureSend(payload) { return super.secureSend(payload.type === 'm.login.protocol' ? { ...payload, 'org.mxchat.device_verification': 1 } : payload); }
 }
@@ -85,7 +86,7 @@ const metadata = { device_authorization_endpoint: 'https://auth.example/device',
       }),
     }, { signal: new AbortController().signal, onStage() {} });
     // Expose results through the same synthetic RPC interface.
-    finished = { secrets: handoff ? { 'org.mxchat.device_verification': { user_id: result.session.userId, device_id: result.secrets.deviceVerification.deviceId } } : result.secrets,
+    finished = { secrets: cached ? { 'org.mxchat.cached_secrets': result.secrets.qrBootstrap } : handoff ? { 'org.mxchat.device_verification': { user_id: result.session.userId, device_id: result.secrets.deviceVerification.deviceId } } : result.secrets,
       serverName: 'example.org', tokenReceived: result.session.accessToken === 'synthetic-token', passwordLeaked: JSON.stringify(result).includes('synthetic-password') };
     return;
   }

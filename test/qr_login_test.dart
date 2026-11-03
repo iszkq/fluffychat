@@ -490,17 +490,23 @@ void main() {
   final sdkProject = Platform.environment['QR_LOGIN_JS_PROJECT'];
   for (final passwordLogin in [false, true]) {
     for (final handoff in [false, true]) {
-      for (final manualCode in [false, true]) {
-        if (passwordLogin && manualCode) continue;
+      for (final manualCode in [false, true, if (passwordLogin) null]) {
+        if (passwordLogin && manualCode == true) continue;
+        final cached = manualCode == null;
         test(
-          'interoperates with real matrix-js-sdk / Rust ECIES, ${passwordLogin ? "password" : "DAG"} and ${handoff ? "SAS handoff" : "secrets"} flow (manual code: $manualCode)',
+          'interoperates with real matrix-js-sdk / Rust ECIES, ${passwordLogin ? "password" : "DAG"} and ${cached
+              ? "automatic cached secrets"
+              : handoff
+              ? "SAS handoff"
+              : "secrets"} flow (manual code: $manualCode)',
           () async {
             final peer = await Process.start('node', [
               'scripts/qr_login_test_peer.mjs',
               sdkProject!,
               if (handoff) '--handoff',
-              if (manualCode) '--manual-code',
+              if (manualCode == true) '--manual-code',
               if (passwordLogin) '--password',
+              if (cached) '--cached',
             ]);
             final lines = StreamIterator(
               peer.stdout
@@ -583,6 +589,7 @@ void main() {
               final account = _PeerAccount(
                 () => serial({'command': 'status'}),
                 handoff: handoff,
+                cached: cached,
               )..hasKeys = !handoff;
               final flow = QrLoginExistingDevice(
                 account: account,
@@ -607,7 +614,7 @@ void main() {
                   if (passwordLogin) fail('Password QR must not open OAuth');
                   expect(
                     uri.toString(),
-                    manualCode
+                    manualCode == true
                         ? 'https://auth.example/verify'
                         : 'https://auth.example/verify?user_code=TEST',
                   );
@@ -628,7 +635,18 @@ void main() {
               expect(finished['tokenReceived'], isTrue);
               if (passwordLogin) expect(finished['passwordLeaked'], isFalse);
               final secrets = finished['secrets'] as Map;
-              if (handoff) {
+              if (cached) {
+                final bundle = secrets['org.mxchat.cached_secrets'] as Map;
+                expect(bundle['user_id'], account.userId);
+                expect(bundle['device_id'], startsWith('MXCHAT_'));
+                expect(bundle['master_key'], 'synthetic-public-master');
+                expect(
+                  secrets.containsKey('org.mxchat.device_verification'),
+                  isFalse,
+                );
+                expect(flow.needsDeviceVerification, isFalse);
+                expect(account.exports, 0);
+              } else if (handoff) {
                 expect(secrets['org.mxchat.device_verification'], {
                   'user_id': account.userId,
                   'device_id': account.deviceId,
@@ -662,7 +680,27 @@ void main() {
 class _PeerAccount extends FakeAccount {
   final Future<Map<String, Object?>> Function() status;
   final bool handoff;
-  _PeerAccount(this.status, {this.handoff = false});
+  final bool cached;
+  _PeerAccount(this.status, {this.handoff = false, this.cached = false});
+  @override
+  bool get supportsCachedSecrets => cached;
+  @override
+  Future<Map<String, Object?>> exportCachedSecrets(String newDeviceId) async =>
+      {
+        'version': 1,
+        'user_id': userId,
+        'device_id': newDeviceId,
+        'master_key': 'synthetic-public-master',
+        'self_signing_key': {
+          'private_key': 'synthetic-self',
+          'public_key': 'synthetic-public-self',
+        },
+        'user_signing_key': {
+          'private_key': 'synthetic-user',
+          'public_key': 'synthetic-public-user',
+        },
+        'backup': {'key': 'synthetic-backup', 'backup_version': '1'},
+      };
   @override
   String get deviceId => 'SYNTHETIC_PHONE';
   @override

@@ -10,6 +10,7 @@ import 'package:fluffychat/utils/crypto_identity_watcher.dart';
 import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
+import 'package:fluffychat/utils/recovery_devices.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +28,7 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
   bool _disposed = false;
   bool _startingVerification = false;
   bool _refreshingDevices = false;
+  bool _deviceDiscoveryStarted = false;
   KeyVerification? _completedVerification;
   Object? _identityError;
 
@@ -84,7 +86,11 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
     value.recoveryError = null;
     _notify();
     try {
-      await client.updateUserDeviceKeys().timeout(const Duration(seconds: 20));
+      if (device == null) {
+        await refreshRecoveryDevices(
+          client,
+        ).timeout(const Duration(seconds: 20));
+      }
       if (_disposed) return;
       final devices = client.userDeviceKeys[client.userID!];
       if (devices == null) {
@@ -112,21 +118,29 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
     }
   }
 
+  void _publishCachedDevices() {
+    final known = client.userDeviceKeys[client.userID];
+    if (known == null) return;
+    value.connectedDevices = known.deviceKeys.values
+        .where(
+          (device) => device.deviceId != client.deviceID && !device.blocked,
+        )
+        .toList();
+    _notify();
+  }
+
   Future<void> refreshConnectedDevices() async {
     if (_refreshingDevices || _disposed) return;
+    _deviceDiscoveryStarted = true;
     _refreshingDevices = true;
+    value.isRefreshingDevices = true;
+    _notify();
     try {
-      await client.updateUserDeviceKeys().timeout(const Duration(seconds: 20));
+      _publishCachedDevices();
+      await refreshRecoveryDevices(client).timeout(const Duration(seconds: 20));
       if (_disposed) return;
-      final devices =
-          client.userDeviceKeys[client.userID!]?.deviceKeys.values
-              .where(
-                (device) =>
-                    device.deviceId != client.deviceID && !device.blocked,
-              )
-              .toList() ??
-          <DeviceKeys>[];
-      value.connectedDevices = devices;
+      _publishCachedDevices();
+      final devices = value.connectedDevices ?? <DeviceKeys>[];
       value.recoveryError = null;
       _notify();
       // Preserve automatic requests to signed devices. Other own devices remain
@@ -145,6 +159,8 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
       }
     } finally {
       _refreshingDevices = false;
+      value.isRefreshingDevices = false;
+      _notify();
     }
   }
 
@@ -164,6 +180,7 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
       onState: (state) {
         if (_disposed) return;
         value.cryptoIdentityState = state;
+        _publishCachedDevices();
         if (identical(value.recoveryError, _identityError)) {
           value.recoveryError = null;
         }
@@ -177,7 +194,7 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
         if (state.initialized &&
             !state.connected &&
             !value.reset &&
-            value.connectedDevices == null) {
+            !_deviceDiscoveryStarted) {
           unawaited(refreshConnectedDevices());
         }
       },

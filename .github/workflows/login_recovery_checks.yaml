@@ -9,6 +9,10 @@ on:
       - 'lib/pages/bootstrap/**'
       - 'lib/pages/login/**'
       - 'lib/utils/sign_in_flows/**'
+      - 'lib/utils/qr_login/**'
+      - 'test/cached_secrets_test.dart'
+      - 'scripts/qr_login_pc_peer/**'
+      - 'scripts/qr_login_test_peer.mjs'
       - 'lib/utils/crypto_identity_watcher.dart'
       - 'test/*recovery*test.dart'
       - 'test/*login*test.dart'
@@ -38,11 +42,15 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y libsqlcipher-dev
           npm install --prefix "$RUNNER_TEMP/qr-login-peer" --no-audit --no-fund --ignore-scripts matrix-js-sdk@45.0.0 qrcode@1.5.4
+      - name: Verify automatic QR trust and backup recovery with the real Rust engine
+        run: |
+          ln -s "$RUNNER_TEMP/qr-login-peer/node_modules" scripts/qr_login_pc_peer/node_modules
+          node --test scripts/qr_login_pc_peer/tests/qr-key-recovery.test.js
       - name: Analyze application and regression tests
         run: |
           flutter pub get
           flutter gen-l10n
-          flutter analyze --no-fatal-infos --no-fatal-warnings lib test/bootstrap_recovery_test.dart test/native_password_login_test.dart test/login_discovery_test.dart test/crypto_identity_watcher_test.dart
+          flutter analyze --no-fatal-infos --no-fatal-warnings lib test/bootstrap_recovery_test.dart test/native_password_login_test.dart test/login_discovery_test.dart test/crypto_identity_watcher_test.dart test/cached_secrets_test.dart
       - name: Run the actual login and recovery pages
         run: flutter test --no-pub --concurrency=1 --reporter expanded test/native_password_login_test.dart test/bootstrap_recovery_test.dart
       - name: Run QR interoperability, encrypted credentials, discovery and delayed-secret regressions

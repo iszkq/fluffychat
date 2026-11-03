@@ -69,13 +69,17 @@ class _RestoreBootstrapViewState extends State<RestoreBootstrapView> {
               style: TextStyle(color: theme.colorScheme.error),
             ),
             trailing: TextButton(
-              onPressed: viewModel.refreshConnectedDevices,
+              onPressed: viewModel.value.isRefreshingDevices
+                  ? null
+                  : viewModel.refreshConnectedDevices,
               child: Text(L10n.of(context).tryAgain),
             ),
           ),
         if (keyVerification == null)
           TextButton.icon(
-            onPressed: viewModel.refreshConnectedDevices,
+            onPressed: viewModel.value.isRefreshingDevices
+                ? null
+                : viewModel.refreshConnectedDevices,
             icon: const Icon(Icons.devices_outlined),
             label: Text(L10n.of(context).verifyOtherDevice),
           ),
@@ -159,7 +163,9 @@ class _RestoreBootstrapViewState extends State<RestoreBootstrapView> {
           ),
         ] else ...[
           Text(
-            L10n.of(context).restoreBootstrapEmptyDevicesDescription,
+            viewModel.value.isRefreshingDevices
+                ? L10n.of(context).loadingPleaseWait
+                : L10n.of(context).restoreBootstrapEmptyDevicesDescription,
             textAlign: .center,
           ),
           const SizedBox(height: 32),

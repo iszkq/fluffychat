@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -88,7 +89,8 @@ extension LocalizedExceptionExtension on Object {
         context,
       ).badServerLoginTypesException(serverVersions, supportedVersions);
     }
-    if (this is IOException ||
+    if (this is TimeoutException ||
+        this is IOException ||
         this is SocketException ||
         this is SyncConnectionException ||
         this is ClientException) {

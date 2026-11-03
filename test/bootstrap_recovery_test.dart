@@ -1,3 +1,4 @@
+import 'dart:async';
 // SPDX-FileCopyrightText: 2026 Contributors to FluffyChat
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -59,6 +60,9 @@ class _Crypto implements Encryption {
 class _Client extends Client {
   bool connected = false;
   bool offline = false;
+  Completer<QueryKeysResponse>? pendingQuery;
+  int broadRefreshes = 0;
+  Map<String, List<String>>? queried;
   _Client() : super('recovery-test', database: _UnusedDatabase()) {
     for (final type in [
       EventTypes.MegolmBackup,
@@ -77,7 +81,21 @@ class _Client extends Client {
   late final Encryption encryption = _Crypto(this);
   @override
   Future<void> updateUserDeviceKeys({Set<String>? additionalUsers}) async {
+    broadRefreshes++;
+    throw StateError('Recovery must not enumerate every encrypted room');
+  }
+
+  @override
+  Future<QueryKeysResponse> queryKeys(
+    Map<String, List<String>> deviceKeys, {
+    int? timeout,
+  }) async {
+    queried = deviceKeys;
     if (offline) throw StateError('device-query-offline');
+    if (pendingQuery != null) return pendingQuery!.future;
+    return QueryKeysResponse.fromJson({
+      'device_keys': {userID: {}},
+    });
   }
 
   @override
@@ -288,6 +306,47 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  testWidgets(
+    'cached devices stay selectable while own-device query stalls and times out',
+    (tester) async {
+      final client = _Client()..pendingQuery = Completer<QueryKeysResponse>();
+      final request = _Request(client);
+      final desktop = _Device('PC', request);
+      client.userDeviceKeys[client.userID] = DeviceKeysList(
+        client.userID,
+        client,
+        deviceKeys: {'PC': desktop},
+      );
+      await _mountRecovery(tester, client);
+      expect(find.text('Desktop PC'), findsOneWidget);
+      expect(client.queried?.keys, [client.userID]);
+      expect(client.broadRefreshes, 0);
+      await tester.pump(const Duration(seconds: 21));
+      expect(find.textContaining('TimeoutException'), findsNothing);
+      expect(find.text('Desktop PC'), findsOneWidget);
+      await tester.tap(find.text('Desktop PC'));
+      await tester.pump();
+      expect(desktop.starts, 1);
+      expect(client.broadRefreshes, 0);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('devices arriving after a query timeout appear on recovery without restarting', (tester) async {
+    final client = _Client()..pendingQuery = Completer<QueryKeysResponse>();
+    await _mountRecovery(tester, client);
+    await tester.pump(const Duration(seconds: 21));
+    expect(find.textContaining('TimeoutException'), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
+    final request = _Request(client);
+    client.userDeviceKeys[client.userID] = DeviceKeysList(client.userID, client,
+      deviceKeys: {'PC': _Device('PC', request)});
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    expect(find.text('Desktop PC'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   testWidgets('periodic updates do not stack SAS dialogs', (tester) async {
     final client = _Client();
