@@ -35,7 +35,7 @@ function receiveFailure(payload) {
 export async function completePasswordQrLogin(context, { signal, onStage }) {
   const { flow, baseUrl, createClient, resolve } = context;
   const channel = flow.channel;
-  let loginClient; let tokens; let finished = false;
+  let loginClient; let tokens; let requestedDeviceId; let finished = false;
   try {
     await flow.connect(); signal.throwIfAborted();
     onStage('login');
@@ -49,7 +49,7 @@ export async function completePasswordQrLogin(context, { signal, onStage }) {
     if (userId.indexOf(':') < 2 || domain !== hello.homeserver ||
         !sameLoginHomeserver(await resolve(hello.homeserver), baseUrl)) throw new Error('手机账号的服务器与填写的服务器不一致，请取消后重新填写');
     signal.throwIfAborted();
-    const deviceId = `MXCHAT_${crypto.randomUUID().replaceAll('-', '').slice(0, 20)}`;
+    const deviceId = requestedDeviceId = `MXCHAT_${crypto.randomUUID().replaceAll('-', '').slice(0, 20)}`;
     await channel.secureSend({ type: 'org.mxchat.login.request', protocol: 'org.mxchat.password.v1', device_id: deviceId,
       ...(hello['org.mxchat.cached_secrets'] === 1 ? { 'org.mxchat.cached_secrets': 1 } : {}) });
     let credentials = receiveFailure(await channel.secureReceive());
@@ -107,8 +107,8 @@ export async function completePasswordQrLogin(context, { signal, onStage }) {
       // server response or mismatched whoami must not log out another device.
       try {
         const identity = await loginClient.whoami();
-        if (identity.user_id === tokens.user_id && identity.device_id === tokens.device_id &&
-            tokens.device_id?.startsWith('MXCHAT_')) await loginClient.logout();
+        if (identity.user_id === tokens.user_id && identity.device_id === requestedDeviceId &&
+            tokens.device_id === requestedDeviceId) await loginClient.logout();
       } catch { /* Device management can revoke an orphan if the server is unavailable. */ }
     }
   }
