@@ -170,6 +170,7 @@ void main() {
           ),
         ),
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('connect-server'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));

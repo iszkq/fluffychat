@@ -166,8 +166,7 @@ Future<GoRouter> _mountRecovery(WidgetTester tester, _Client client) async {
       ),
     ),
   );
-  await tester.pump();
-  await tester.pump();
+  await tester.pumpAndSettle();
   return router;
 }
 
