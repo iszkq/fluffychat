@@ -15,10 +15,18 @@ import 'package:material_ui/material_ui.dart';
 import 'package:matrix/encryption/utils/key_verification.dart';
 import 'package:matrix/matrix.dart';
 
-class RestoreBootstrapView extends StatelessWidget {
+class RestoreBootstrapView extends StatefulWidget {
   final BootstrapViewModel viewModel;
 
   const RestoreBootstrapView(this.viewModel, {super.key});
+
+  @override
+  State<RestoreBootstrapView> createState() => _RestoreBootstrapViewState();
+}
+
+class _RestoreBootstrapViewState extends State<RestoreBootstrapView> {
+  KeyVerification? _shownVerification;
+  BootstrapViewModel get viewModel => widget.viewModel;
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +34,15 @@ class RestoreBootstrapView extends StatelessWidget {
     final keyVerification = viewModel.value.keyVerification;
     if (keyVerification != null) {
       Logs().v('Key verification state:', keyVerification.state);
-      if (keyVerification.state == KeyVerificationState.askSas) {
+      if (keyVerification.state == KeyVerificationState.askSas &&
+          !identical(_shownVerification, keyVerification)) {
+        _shownVerification = keyVerification;
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted ||
+              !identical(viewModel.value.keyVerification, keyVerification) ||
+              keyVerification.state != KeyVerificationState.askSas) {
+            return;
+          }
           KeyVerificationDialog(request: keyVerification).show(context);
         });
       }
@@ -36,6 +51,7 @@ class RestoreBootstrapView extends StatelessWidget {
         viewModel.value.connectedDevices
             ?.map(
               (device) => (
+                device: device,
                 title: device.displayname,
                 lastActive: device.lastActive,
                 icon: device.icon,
@@ -46,33 +62,51 @@ class RestoreBootstrapView extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
-        if (keyVerification != null) ...[
+        if (viewModel.value.recoveryError != null)
           ListTile(
-            leading:
-                (keyVerification.state == KeyVerificationState.error ||
-                    viewModel.value.noSecretsreceived)
-                ? IconButton(
-                    onPressed: viewModel.value.isLoading
-                        ? null
-                        : viewModel.retryKeyVerification,
-                    tooltip: L10n.of(context).tryAgain,
-                    icon: Icon(Icons.refresh_outlined),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: CircularProgressIndicator.adaptive(),
-                  ),
-            minLeadingWidth: 40,
             title: Text(
-              viewModel.value.waitingForSecrets
-                  ? L10n.of(context).waitingForKeys
-                  : viewModel.value.noSecretsreceived
-                  ? L10n.of(context).noKeysTransmitted
-                  : L10n.of(context).restoreBootstrapDevicesDescription,
-
-              style: TextStyle(fontSize: 14),
+              viewModel.value.recoveryError!.toLocalizedString(context),
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
+            trailing: TextButton(
+              onPressed: viewModel.refreshConnectedDevices,
+              child: Text(L10n.of(context).tryAgain),
             ),
           ),
+        if (keyVerification == null)
+          TextButton.icon(
+            onPressed: viewModel.refreshConnectedDevices,
+            icon: const Icon(Icons.devices_outlined),
+            label: Text(L10n.of(context).verifyOtherDevice),
+          ),
+        if (keyVerification != null || devices.isNotEmpty) ...[
+          if (keyVerification != null)
+            ListTile(
+              leading:
+                  (keyVerification.state == KeyVerificationState.error ||
+                      viewModel.value.noSecretsreceived)
+                  ? IconButton(
+                      onPressed: viewModel.value.isLoading
+                          ? null
+                          : viewModel.retryKeyVerification,
+                      tooltip: L10n.of(context).tryAgain,
+                      icon: Icon(Icons.refresh_outlined),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: CircularProgressIndicator.adaptive(),
+                    ),
+              minLeadingWidth: 40,
+              title: Text(
+                viewModel.value.waitingForSecrets
+                    ? L10n.of(context).waitingForKeys
+                    : viewModel.value.noSecretsreceived
+                    ? L10n.of(context).noKeysTransmitted
+                    : L10n.of(context).restoreBootstrapDevicesDescription,
+
+                style: TextStyle(fontSize: 14),
+              ),
+            ),
           const SizedBox(height: 16),
           Material(
             color: theme.colorScheme.surfaceContainer,
@@ -89,6 +123,8 @@ class RestoreBootstrapView extends StatelessWidget {
                   shrinkWrap: true,
                   itemCount: devices.length,
                   itemBuilder: (context, i) => ListTile(
+                    onTap: () =>
+                        viewModel.retryKeyVerification(devices[i].device),
                     leading: CircleAvatar(
                       foregroundColor: theme.colorScheme.onPrimary,
                       backgroundColor: theme.colorScheme.primary,

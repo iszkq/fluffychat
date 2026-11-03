@@ -1,0 +1,49 @@
+name: Login and recovery regressions
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    branches: [codex/qr-password-login-3.0.2]
+    paths:
+      - 'lib/pages/bootstrap/**'
+      - 'lib/pages/login/**'
+      - 'lib/utils/sign_in_flows/**'
+      - 'lib/utils/crypto_identity_watcher.dart'
+      - 'test/*recovery*test.dart'
+      - 'test/*login*test.dart'
+      - 'test/crypto_identity_watcher_test.dart'
+      - 'scripts/validate_qr_login.py'
+      - '.github/workflows/login_recovery_checks.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version-file: .tool_versions.yaml
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Install native test and interoperability dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libsqlcipher-dev
+          npm install --prefix "$RUNNER_TEMP/qr-login-peer" --no-audit --no-fund --ignore-scripts matrix-js-sdk@45.0.0 qrcode@1.5.4
+      - name: Analyze application and regression tests
+        run: |
+          flutter pub get
+          flutter gen-l10n
+          flutter analyze --no-fatal-infos --no-fatal-warnings lib test/bootstrap_recovery_test.dart test/native_password_login_test.dart test/login_discovery_test.dart test/crypto_identity_watcher_test.dart
+      - name: Run the actual login and recovery pages
+        run: flutter test --no-pub --concurrency=1 --reporter expanded test/native_password_login_test.dart test/bootstrap_recovery_test.dart
+      - name: Run QR interoperability, encrypted credentials, discovery and delayed-secret regressions
+        run: python3 scripts/validate_qr_login.py --flutter "$(command -v flutter)" --js-project "$RUNNER_TEMP/qr-login-peer"

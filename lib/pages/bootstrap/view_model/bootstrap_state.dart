@@ -10,6 +10,7 @@ class BootstrapViewModelState {
   String? recoveryKey;
   bool isLoading = false;
   Object? unlockWithError;
+  Object? recoveryError;
   ({
     bool connected,
     bool crossSigningEnabled,

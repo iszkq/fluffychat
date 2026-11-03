@@ -11,7 +11,6 @@ import 'package:fluffychat/utils/qr_login/matrix_credential_vault.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
-import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:matrix/matrix.dart';
@@ -39,7 +38,6 @@ class LoginController extends State<Login> {
       setState(() => showPassword = !loading && !showPassword);
 
   Future<void> login() async {
-    final matrix = Matrix.of(context);
     if (usernameController.text.isEmpty) {
       setState(() => usernameError = L10n.of(context).pleaseEnterYourUsername);
     } else {
@@ -75,7 +73,8 @@ class LoginController extends State<Login> {
       } else {
         identifier = AuthenticationUserIdentifier(user: username);
       }
-      final client = await matrix.getLoginClient();
+      // Use the exact client whose homeserver was discovered for this page.
+      final client = widget.client;
       final password = passwordController.text;
       await client.login(
         LoginType.mLoginPassword,
@@ -89,14 +88,16 @@ class LoginController extends State<Login> {
         initialDeviceDisplayName: PlatformInfos.appDisplayName,
       );
       MatrixCredentialVault.captureAfterLogin(client, password);
-      passwordController.clear();
+      if (mounted) passwordController.clear();
       if (mounted) {
         context.go('/backup');
       }
     } on MatrixException catch (exception) {
+      if (!mounted) return;
       setState(() => passwordError = exception.errorMessage);
       return setState(() => loading = false);
     } catch (exception) {
+      if (!mounted) return;
       setState(() => passwordError = exception.toString());
       return setState(() => loading = false);
     }
@@ -261,6 +262,7 @@ class LoginController extends State<Login> {
 
   @override
   void dispose() {
+    _coolDown?.cancel();
     usernameController.dispose();
     passwordController.dispose();
     super.dispose();

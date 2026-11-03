@@ -3,7 +3,10 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
+import 'package:fluffychat/utils/crypto_identity_watcher.dart';
 import 'package:fluffychat/utils/error_reporter.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
@@ -19,6 +22,17 @@ import 'bootstrap_state.dart';
 class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
   final Client client;
   final bool reset;
+  CryptoIdentityWatcher? _identityWatcher;
+  Timer? _secretsTimeout;
+  bool _disposed = false;
+  bool _startingVerification = false;
+  bool _refreshingDevices = false;
+  KeyVerification? _completedVerification;
+  Object? _identityError;
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
 
   final TextEditingController enterPassphraseOrRecovController =
       TextEditingController();
@@ -34,6 +48,9 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
 
   @override
   void dispose() {
+    _disposed = true;
+    _identityWatcher?.dispose();
+    _secretsTimeout?.cancel();
     _cancelKeyVerification();
     enterPassphraseOrRecovController.dispose();
     newPassphraseController.dispose();
@@ -54,58 +71,142 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
       RegExp(r'[!@#$%^&*(),.?":{}|<>]'),
     );
     value.newPassphraseNumbers = passphrase.contains(RegExp(r'\d'));
-    notifyListeners();
+    _notify();
   }
 
-  Future<void> retryKeyVerification() async {
+  Future<void> retryKeyVerification([DeviceKeys? device]) async {
+    if (_startingVerification || _disposed) return;
+    _startingVerification = true;
+    _cancelKeyVerification();
+    _secretsTimeout?.cancel();
+    value.waitingForSecrets = false;
     value.noSecretsreceived = false;
-    value.keyVerification = await client.userDeviceKeys[client.userID!]!
-        .startVerification();
-    value.keyVerification?.onUpdate = _onKeyVerificationUpdate;
-    notifyListeners();
+    value.recoveryError = null;
+    _notify();
+    try {
+      await client.updateUserDeviceKeys().timeout(const Duration(seconds: 20));
+      if (_disposed) return;
+      final devices = client.userDeviceKeys[client.userID!];
+      if (devices == null) {
+        throw StateError('No devices available for verification');
+      }
+      final request = device == null
+          ? await devices.startVerification()
+          : await device.startVerification();
+      if (_disposed) {
+        unawaited(request.cancel());
+        return;
+      }
+      value.keyVerification = request;
+      request.onUpdate = () {
+        if (identical(value.keyVerification, request)) {
+          unawaited(_onKeyVerificationUpdate());
+        }
+      };
+      await _onKeyVerificationUpdate();
+    } catch (error) {
+      if (!_disposed) value.recoveryError = error;
+    } finally {
+      _startingVerification = false;
+      _notify();
+    }
   }
 
-  Future<void> _init() async {
-    final state = value.cryptoIdentityState = await client
-        .getCryptoIdentityState();
+  Future<void> refreshConnectedDevices() async {
+    if (_refreshingDevices || _disposed) return;
+    _refreshingDevices = true;
+    try {
+      await client.updateUserDeviceKeys().timeout(const Duration(seconds: 20));
+      if (_disposed) return;
+      final devices =
+          client.userDeviceKeys[client.userID!]?.deviceKeys.values
+              .where(
+                (device) =>
+                    device.deviceId != client.deviceID && !device.blocked,
+              )
+              .toList() ??
+          <DeviceKeys>[];
+      value.connectedDevices = devices;
+      value.recoveryError = null;
+      _notify();
+      // Preserve automatic requests to signed devices. Other own devices remain
+      // visible and can be selected for explicit SAS; listing never trusts them.
+      if (value.keyVerification == null &&
+          devices.any(
+            (device) =>
+                device.hasValidSignatureChain(verifiedByTheirMasterKey: true),
+          )) {
+        await retryKeyVerification();
+      }
+    } catch (error) {
+      if (!_disposed) {
+        value.recoveryError = error;
+        _notify();
+      }
+    } finally {
+      _refreshingDevices = false;
+    }
+  }
+
+  void _init() {
     newPassphraseController.addListener(_checkCanCreatePassphrase);
     repeatPassphraseController.addListener(_checkCanCreatePassphrase);
     enterPassphraseOrRecovController.addListener(
       _passphraseOrRecoveryKeyEntered,
     );
-    if (state.initialized) {
-      if (state.connected) return notifyListeners();
-
-      await client.updateUserDeviceKeys();
-
-      final devices = value.connectedDevices =
-          client.userDeviceKeys[client.userID!]?.deviceKeys.values
-              .where(
-                (device) => device.hasValidSignatureChain(
-                  verifiedByTheirMasterKey: true,
-                ),
-              )
-              .toList() ??
-          [];
-      if (devices.isNotEmpty) {
-        value.keyVerification = await client.userDeviceKeys[client.userID!]!
-            .startVerification();
-        value.keyVerification?.onUpdate = _onKeyVerificationUpdate;
-      }
-      if (supportsSecureStorage) {
-        try {
-          final keyFromSecureStorage = await FlutterSecureStorage().read(
-            key: _secureStorageKey,
-          );
-          if (keyFromSecureStorage != null) {
-            enterPassphraseOrRecovController.text = keyFromSecureStorage;
-          }
-        } catch (e, s) {
-          Logs().e('Unable to read key from secure storage', e, s);
+    _identityWatcher = CryptoIdentityWatcher(
+      read: client.getCryptoIdentityState,
+      events: [
+        client.onSync.stream,
+        if (client.encryption != null)
+          client.encryption!.ssss.onSecretStored.stream,
+      ],
+      onState: (state) {
+        if (_disposed) return;
+        value.cryptoIdentityState = state;
+        if (identical(value.recoveryError, _identityError)) {
+          value.recoveryError = null;
         }
-      }
+        _identityError = null;
+        if (state.connected) {
+          _secretsTimeout?.cancel();
+          value.waitingForSecrets = false;
+          value.noSecretsreceived = false;
+        }
+        _notify();
+        if (state.initialized &&
+            !state.connected &&
+            !value.reset &&
+            value.connectedDevices == null) {
+          unawaited(refreshConnectedDevices());
+        }
+      },
+      onError: (error) {
+        _identityError = error;
+        value.recoveryError = error;
+        _notify();
+      },
+    )..start();
+    if (supportsSecureStorage) {
+      unawaited(_readRecoveryKey());
     }
-    notifyListeners();
+  }
+
+  Future<void> refreshCryptoIdentity() async {
+    await _identityWatcher?.refresh();
+  }
+
+  Future<void> _readRecoveryKey() async {
+    try {
+      final key = await const FlutterSecureStorage().read(
+        key: _secureStorageKey,
+      );
+      if (!_disposed && key != null) {
+        enterPassphraseOrRecovController.text = key;
+      }
+    } catch (error, stack) {
+      Logs().e('Unable to read key from secure storage', error, stack);
+    }
   }
 
   void _passphraseOrRecoveryKeyEntered() {
@@ -114,32 +215,28 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
     if (value.passphraseOrRecoveryKeyEntered !=
         passphraseOrRecoveryKeyEntered) {
       value.passphraseOrRecoveryKeyEntered = passphraseOrRecoveryKeyEntered;
-      notifyListeners();
+      _notify();
     }
   }
 
   Future<void> _onKeyVerificationUpdate() async {
-    if (value.keyVerification?.state == KeyVerificationState.done) {
+    if (_disposed) return;
+    if (value.keyVerification?.state == KeyVerificationState.done &&
+        !identical(_completedVerification, value.keyVerification) &&
+        value.cryptoIdentityState?.connected != true) {
+      _completedVerification = value.keyVerification;
       value.waitingForSecrets = true;
       value.noSecretsreceived = false;
-      notifyListeners();
-      value.cryptoIdentityState = await client.getCryptoIdentityState();
-      var tries = 0;
-      const max = 10;
-      while (value.cryptoIdentityState?.connected != true) {
-        Logs().d('Waiting for secrets... [$tries/$max]');
-        if (tries >= max) return;
-        await Future.delayed(const Duration(seconds: 1));
-        value.cryptoIdentityState = await client.getCryptoIdentityState();
-        tries++;
-      }
-
-      if (value.cryptoIdentityState?.connected != true) {
+      _secretsTimeout?.cancel();
+      _secretsTimeout = Timer(const Duration(seconds: 30), () {
+        if (_disposed || value.cryptoIdentityState?.connected == true) return;
         value.waitingForSecrets = false;
         value.noSecretsreceived = true;
-      }
+        _notify();
+      });
     }
-    notifyListeners();
+    _notify();
+    await _identityWatcher?.refresh();
   }
 
   Future<void> setOrSkipPassphrase(
@@ -147,7 +244,7 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
     BuildContext context,
   ) async {
     value.isLoading = true;
-    notifyListeners();
+    _notify();
     try {
       final state = await client.getCryptoIdentityState();
       if (state.connected) {
@@ -175,11 +272,13 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
       ).showSnackBar(SnackBar(content: Text(e.toLocalizedString(context))));
       value.isLoading = false;
     }
-    notifyListeners();
+    _notify();
   }
 
   void _cancelKeyVerification() {
     final keyVerification = value.keyVerification;
+    value.keyVerification = null;
+    if (keyVerification != null) keyVerification.onUpdate = null;
     if (keyVerification != null &&
         keyVerification.state != KeyVerificationState.done &&
         keyVerification.state != KeyVerificationState.error) {
@@ -198,12 +297,13 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
 
     value.unlockWithError = null;
     value.isLoading = true;
-    notifyListeners();
+    _notify();
     try {
       await client.restoreCryptoIdentity(key);
+      if (_disposed) return;
       value.isLoading = false;
       value.cryptoIdentityState = await client.getCryptoIdentityState();
-      notifyListeners();
+      _notify();
       return;
     } catch (e, s) {
       if (e is! InvalidPassphraseException) {
@@ -216,7 +316,7 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
       }
       value.isLoading = false;
       value.unlockWithError = e;
-      notifyListeners();
+      _notify();
       if (supportsSecureStorage) {
         await FlutterSecureStorage().delete(key: _secureStorageKey);
       }
@@ -242,17 +342,17 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
         );
       }
     }
-    context.go('/rooms');
+    if (!_disposed && context.mounted) context.go('/rooms');
   }
 
   void toggleObscureText() {
     value.obscureText = !value.obscureText;
-    notifyListeners();
+    _notify();
   }
 
   void startResetAccount() {
     value.reset = true;
-    notifyListeners();
+    _notify();
   }
 
   String get _secureStorageKey => 'ssss_recovery_key_${client.userID}';
@@ -289,7 +389,7 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
     );
     if (path == null) return;
     value.recoveryKeyDownloaded = downloaded == true;
-    notifyListeners();
+    _notify();
   }
 
   Future<void> toggleRecoveryKeyStoredInSecureStorage(bool? stored) async {
@@ -302,6 +402,6 @@ class BootstrapViewModel extends ValueNotifier<BootstrapViewModelState> {
       await FlutterSecureStorage().delete(key: _secureStorageKey);
     }
     value.recoveryKeyStoredInSecureStorage = stored == true;
-    notifyListeners();
+    _notify();
   }
 }

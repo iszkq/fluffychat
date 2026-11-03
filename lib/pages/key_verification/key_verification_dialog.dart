@@ -33,20 +33,22 @@ class KeyVerificationDialog extends StatefulWidget {
 
 class KeyVerificationPageState extends State<KeyVerificationDialog> {
   void Function()? originalOnUpdate;
-  late final List<dynamic> sasEmoji;
+  List<dynamic>? sasEmoji;
 
   @override
   void initState() {
     originalOnUpdate = widget.request.onUpdate;
     widget.request.onUpdate = () {
       originalOnUpdate?.call();
-      setState(() {});
+      if (mounted) setState(() {});
     };
     widget.request.client.getProfileFromUserId(widget.request.userId).then((p) {
+      if (!mounted) return;
       profile = p;
       setState(() {});
     });
     rootBundle.loadString('assets/sas-emoji.json').then((e) {
+      if (!mounted) return;
       sasEmoji = json.decode(e);
       setState(() {});
     });

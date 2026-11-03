@@ -8,6 +8,7 @@ import 'package:fluffychat/pages/bootstrap/view_model/bootstrap_view_model.dart'
 import 'package:fluffychat/pages/bootstrap/widgets/new_passphrase_view.dart';
 import 'package:fluffychat/pages/bootstrap/widgets/restore_bootstrap_view.dart';
 import 'package:fluffychat/pages/bootstrap/widgets/store_recovery_key_view.dart';
+import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/layouts/login_scaffold.dart';
 import 'package:fluffychat/widgets/matrix.dart';
@@ -28,9 +29,9 @@ class BootstrapPage extends StatelessWidget {
       builder: (context, viewModel, _) {
         final cryptoIdentityState = viewModel.value.cryptoIdentityState;
         if (cryptoIdentityState?.connected == true && !reset) {
-          WidgetsBinding.instance.addPostFrameCallback(
-            (_) => viewModel.goToRoomsPageAfterSuccess(context),
-          );
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) viewModel.goToRoomsPageAfterSuccess(context);
+          });
         }
 
         final title = cryptoIdentityState == null
@@ -83,7 +84,26 @@ class BootstrapPage extends StatelessWidget {
           ),
 
           body: cryptoIdentityState == null
-              ? Center(child: CircularProgressIndicator.adaptive())
+              ? Center(
+                  child: viewModel.value.recoveryError == null
+                      ? CircularProgressIndicator.adaptive()
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              viewModel.value.recoveryError!.toLocalizedString(
+                                context,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            TextButton.icon(
+                              onPressed: viewModel.refreshCryptoIdentity,
+                              icon: const Icon(Icons.refresh_outlined),
+                              label: Text(L10n.of(context).tryAgain),
+                            ),
+                          ],
+                        ),
+                )
               : !cryptoIdentityState.initialized || viewModel.value.reset
               ? viewModel.value.recoveryKey == null
                     ? NewPassphraseView(viewModel)
