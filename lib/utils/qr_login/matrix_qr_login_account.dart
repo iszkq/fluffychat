@@ -8,6 +8,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:matrix/encryption.dart';
 import 'package:matrix/matrix.dart';
 
+import 'credential_vault.dart';
+import 'matrix_credential_vault.dart';
 import 'msc4108_channel.dart';
 import 'qr_login_existing_device.dart';
 
@@ -34,6 +36,18 @@ class MatrixQrLoginAccount extends QrLoginAccount {
         client.userID != userId ||
         client.deviceID != _deviceId) {
       throw const QrLoginException('account_changed');
+    }
+  }
+
+  @override
+  Future<String> loadPassword() async {
+    _checkAccount();
+    try {
+      final password = await MatrixCredentialVault(client).loadPassword();
+      _checkAccount();
+      return password;
+    } on CredentialVaultException catch (error) {
+      throw QrLoginException(error.reason);
     }
   }
 

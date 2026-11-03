@@ -3,6 +3,7 @@
 // Synthetic, offline interoperability peer. No real accounts, keys or tokens.
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline';
 const requireSdk = createRequire(resolve(process.argv[2], 'package.json'));
@@ -28,12 +29,14 @@ const session = {
 };
 const handoff = process.argv.includes('--handoff');
 const manualCode = process.argv.includes('--manual-code');
+const passwordLogin = process.argv.includes('--password');
 class CapableChannel extends MSC4108SecureChannel {
   secureSend(payload) { return super.secureSend(payload.type === 'm.login.protocol' ? { ...payload, 'org.mxchat.device_verification': 1 } : payload); }
 }
 const channel = handoff ? new CapableChannel(session) : new MSC4108SecureChannel(session);
 const flow = new MSC4108SignInWithQR(channel, false);
 await flow.generateCode();
+if (passwordLogin) flow.code[7] = 4;
 const qrcode = requireSdk('qrcode');
 const qr = qrcode.create([{ data: flow.code, mode: 'byte' }], { errorCorrectionLevel: 'L' });
 // Raw payload as actually returned by ZXing/CoreImage (data codewords, before
@@ -61,6 +64,31 @@ globalThis.fetch = async (url, options) => {
 };
 const metadata = { device_authorization_endpoint: 'https://auth.example/device', token_endpoint: 'https://auth.example/token' };
 (async () => {
+  if (passwordLogin) {
+    const desktopSource = resolve(process.argv[2], 'src/password-qr-login.js');
+    // CI uses the checked-in, unchanged mxchat source snapshot; local checks
+    // can exercise the working desktop source directly.
+    const { completePasswordQrLogin } = await import(existsSync(desktopSource)
+      ? pathToFileURL(desktopSource) : new URL('./qr_login_pc_peer/password-qr-login.js', import.meta.url));
+    let expectedDeviceId;
+    const result = await completePasswordQrLogin({
+      baseUrl: 'https://matrix.example.org', resolve: async () => 'https://matrix.example.org',
+      flow: { channel, connect: () => channel.connect() },
+      createClient: () => ({
+        async login(type, body) {
+          if (type !== 'm.login.password' || body.password !== 'synthetic-password' || body.identifier.user !== '@alice:example.org') throw new Error('Incorrect synthetic credentials');
+          expectedDeviceId = body.device_id; newDeviceLoggedIn = true;
+          return { access_token: 'synthetic-token', user_id: '@alice:example.org', device_id: expectedDeviceId };
+        },
+        async whoami() { return { user_id: '@alice:example.org', device_id: expectedDeviceId }; },
+        async logout() { newDeviceLoggedIn = false; },
+      }),
+    }, { signal: new AbortController().signal, onStage() {} });
+    // Expose results through the same synthetic RPC interface.
+    finished = { secrets: handoff ? { 'org.mxchat.device_verification': { user_id: result.session.userId, device_id: result.secrets.deviceVerification.deviceId } } : result.secrets,
+      serverName: 'example.org', tokenReceived: result.session.accessToken === 'synthetic-token', passwordLeaked: JSON.stringify(result).includes('synthetic-password') };
+    return;
+  }
   const negotiation = await flow.negotiateProtocols();
   await flow.deviceAuthorizationGrant({ metadata, clientId: 'synthetic-client', deviceId: 'SYNTHETIC_NEW_DEVICE' });
   const tokens = await flow.completeLoginOnNewDevice({ clientId: 'synthetic-client' });

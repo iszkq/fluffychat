@@ -2911,5 +2911,19 @@
     "qrLoginSecurityError": "登录安全检查失败，请取消并重新生成二维码。",
     "qrLoginNetworkError": "扫码登录未完成，请检查网络，并重新生成二维码后重试。",
     "qrLoginInvalidCode": "登录二维码无效或格式暂不支持，请扫描新设备上重新生成的登录码。",
-    "qrLoginVerifyOnDesktop": "账号已在电脑登录。请关闭此窗口，在电脑和手机上接受设备验证并核对图形。验证通过后会共享可用密钥；当前尚未完成密钥传递。"
+    "qrLoginVerifyOnDesktop": "账号已在电脑登录。请关闭此窗口，在电脑和手机上接受设备验证并核对图形。验证通过后会共享可用密钥；当前尚未完成密钥传递。",
+    "qrLoginPasswordUnavailable": "尚未保存登录凭据，请在手机重新登录一次后扫码。",
+    "qrLoginPasswordConsent": "登录此电脑并同步可用解密密钥？",
+    "qrLoginPasswordInvalid": "保存的密码已失效，请在手机使用当前密码重新登录。",
+    "qrLoginCredentialsReadFailed": "读取服务器登录凭据失败，请检查手机网络后重试。",
+    "qrLoginCredentialsUploadFailed": "登录凭据尚未保存到服务器，请检查手机网络后重试。",
+    "qrLoginCredentialsTimeout": "读取登录凭据超时，请检查手机网络后重新扫码。",
+    "qrLoginCredentialsKeyChanged": "账号加密密钥已变更，请在手机重新登录以更新凭据。",
+    "qrLoginCredentialsCorrupt": "服务器登录凭据无法解密，请在手机重新登录后重试。",
+    "qrLoginSessionExpired": "手机登录已失效，请先重新登录再扫码。",
+    "qrLoginRequestTimeout": "扫码步骤超时，请检查两端网络后重新扫码。",
+    "qrLoginRateLimited": "登录过于频繁，请稍后重新扫码。",
+    "qrLoginAccountDisabled": "账号已被服务器停用，请联系服务器管理员。",
+    "qrLoginPasswordUnsupported": "服务器不支持密码登录，请使用其他登录方式。",
+    "qrLoginDesktopLoginFailed": "电脑连接登录服务器失败，请检查电脑网络后重试。"
 }

@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Contributors to FluffyChat
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
+
 import 'msc4108_channel.dart';
 import 'qr_login_payload.dart';
 
@@ -18,6 +20,8 @@ abstract class QrLoginAccount {
   Future<void> ensureSecretsAvailable();
   Future<bool> deviceExists(String deviceId);
   Future<Map<String, Object?>> exportSecrets();
+  Future<String> loadPassword() async =>
+      throw const QrLoginException('password_not_available');
 
   Future<void> unlockSecrets(String recoveryKeyOrPassphrase) async {
     throw const QrLoginException('keys_locked');
@@ -55,6 +59,10 @@ class QrLoginExistingDevice {
     if (_started) throw StateError('Login already started');
     _started = true;
     try {
+      if (payload.passwordLogin) {
+        await _runPassword(onSharingSecrets);
+        return;
+      }
       final metadata = await account.authMetadata().timeout(
         const Duration(seconds: 20),
       );
@@ -191,22 +199,97 @@ class QrLoginExistingDevice {
       await channel.send({'type': 'm.login.secrets', ...secrets});
       // New device owns rendezvous cleanup. Deleting now could race its GET.
     } catch (error) {
+      final reason = error is QrLoginException
+          ? error.reason
+          : error is TimeoutException
+          ? 'request_timeout'
+          : 'network_error';
       if (!channel.transport.closed) {
         try {
           await channel
-              .send({
-                'type': 'm.login.failure',
-                'reason': error is QrLoginException ? error.reason : 'unknown',
-              })
+              .send({'type': 'm.login.failure', 'reason': reason})
               .timeout(const Duration(seconds: 2));
         } catch (_) {
           /* No established channel or peer already gone. */
         }
       }
-      rethrow;
+      if (error is QrLoginException) rethrow;
+      throw QrLoginException(reason);
     } finally {
       channel.close();
       account.clearSecrets();
+    }
+  }
+
+  Future<void> _runPassword(void Function() onSharingSecrets) async {
+    // run() is invoked only after the phone's explicit consent. The QR pins
+    // the desktop's ephemeral public key; no password enters the QR itself.
+    final separator = account.userId.indexOf(':');
+    if (!account.userId.startsWith('@') || separator < 2) {
+      throw const QrLoginException('account_changed');
+    }
+    channel.transport.checkActive();
+    await channel.connect(payload.publicKey);
+    await channel.send({
+      'type': 'org.mxchat.login.protocols',
+      'protocols': ['org.mxchat.password.v1'],
+      'user_id': account.userId,
+      'homeserver': account.userId.substring(separator + 1),
+    });
+    final request = await channel.receive();
+    final deviceId = request['device_id'];
+    if (request['type'] != 'org.mxchat.login.request' ||
+        request['protocol'] != 'org.mxchat.password.v1' ||
+        deviceId is! String ||
+        deviceId.isEmpty ||
+        deviceId.length > 255 ||
+        deviceId == account.deviceId) {
+      throw const QrLoginException('unexpected_message_received');
+    }
+    if (await account
+        .deviceExists(deviceId)
+        .timeout(const Duration(seconds: 20))) {
+      throw const QrLoginException('device_already_exists');
+    }
+    final password = await account.loadPassword();
+    channel.transport.checkActive();
+    await channel.send({
+      'type': 'org.mxchat.login.credentials',
+      'user_id': account.userId,
+      'password': password,
+    });
+    final result = await channel.receive();
+    if (result['type'] != 'm.login.success' ||
+        result['user_id'] != account.userId ||
+        result['device_id'] != deviceId) {
+      throw const QrLoginException('account_changed');
+    }
+    final deadline = DateTime.now().add(deviceWait);
+    while (!await account
+        .deviceExists(deviceId)
+        .timeout(const Duration(seconds: 20))) {
+      channel.transport.checkActive();
+      if (DateTime.now().isAfter(deadline)) {
+        throw const QrLoginException('device_not_found');
+      }
+      await Future<void>.delayed(devicePollInterval);
+    }
+    onSharingSecrets();
+    try {
+      final secrets = await account.exportSecrets().timeout(
+        const Duration(seconds: 20),
+      );
+      await channel.send({'type': 'm.login.secrets', ...secrets});
+    } on QrLoginException catch (error) {
+      if (error.reason != 'keys_locked' || account.deviceId == null) rethrow;
+      needsDeviceVerification = true;
+      await channel.send({
+        'type': 'm.login.secrets',
+        'org.mxchat.device_verification': {
+          'user_id': account.userId,
+          'device_id': account.deviceId,
+        },
+      });
     }
   }
 

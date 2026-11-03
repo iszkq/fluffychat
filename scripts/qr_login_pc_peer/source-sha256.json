@@ -1,0 +1,8 @@
+{
+  "source": "https://github.com/iszkq/mxchat",
+  "version": "0.3.11",
+  "sha256": {
+    "src/password-qr-login.js": "2cb602170e07491f95bf129708f521e2cc8bcb7806b1a1866ba53071b18cf17e",
+    "src/login-config.js": "dc0c855765dfb6405026a7e87f969c0b14a888089ca459feb6762cec26c15f54"
+  }
+}

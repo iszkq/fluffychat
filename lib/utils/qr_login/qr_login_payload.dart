@@ -9,8 +9,9 @@ import 'dart:typed_data';
 class QrLoginPayload {
   final Uint8List publicKey;
   final Uri rendezvous;
+  final bool passwordLogin;
 
-  QrLoginPayload._(this.publicKey, this.rendezvous);
+  QrLoginPayload._(this.publicKey, this.rendezvous, this.passwordLogin);
 
   static bool _hasHeader(List<int> bytes) =>
       bytes.length >= 6 &&
@@ -46,7 +47,8 @@ class QrLoginPayload {
     if (!_hasHeader(bytes) || bytes.length < 42 || bytes[6] != 2) {
       throw const FormatException('Unsupported login QR version');
     }
-    if (bytes[7] != 3) {
+    // Mode 4 is mxchat's app-to-app password handoff, not MSC4108 OAuth.
+    if (bytes[7] != 3 && bytes[7] != 4) {
       throw const FormatException('Scan a QR displayed by the new device');
     }
     final length = (bytes[40] << 8) | bytes[41];
@@ -57,7 +59,11 @@ class QrLoginPayload {
     if (uri == null || !isSecureQrLoginUri(uri)) {
       throw const FormatException('Login QR requires an HTTPS rendezvous');
     }
-    return QrLoginPayload._(Uint8List.fromList(bytes.sublist(8, 40)), uri);
+    return QrLoginPayload._(
+      Uint8List.fromList(bytes.sublist(8, 40)),
+      uri,
+      bytes[7] == 4,
+    );
   }
 
   static List<int>? _readByteSegments(List<int> words, int countBits) {

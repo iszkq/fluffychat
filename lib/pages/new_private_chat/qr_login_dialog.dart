@@ -186,6 +186,19 @@ class _QrLoginDialogState extends State<QrLoginDialog> {
   }
 
   String _errorText(L10n l10n) => switch (_error) {
+    'password_not_available' => l10n.qrLoginPasswordUnavailable,
+    'password_invalid' => l10n.qrLoginPasswordInvalid,
+    'credentials_read_failed' => l10n.qrLoginCredentialsReadFailed,
+    'credentials_upload_failed' => l10n.qrLoginCredentialsUploadFailed,
+    'credentials_timeout' => l10n.qrLoginCredentialsTimeout,
+    'credentials_key_changed' => l10n.qrLoginCredentialsKeyChanged,
+    'credentials_corrupt' => l10n.qrLoginCredentialsCorrupt,
+    'session_expired' => l10n.qrLoginSessionExpired,
+    'request_timeout' => l10n.qrLoginRequestTimeout,
+    'rate_limited' => l10n.qrLoginRateLimited,
+    'account_disabled' => l10n.qrLoginAccountDisabled,
+    'password_unsupported' => l10n.qrLoginPasswordUnsupported,
+    'login_failed' => l10n.qrLoginDesktopLoginFailed,
     'keys_locked' => l10n.qrLoginKeysLocked,
     'expired' || 'authorization_expired' => l10n.qrLoginExpired,
     'user_cancelled' || 'user_declined' => l10n.qrLoginCancelled,
@@ -209,7 +222,10 @@ class _QrLoginDialogState extends State<QrLoginDialog> {
       _Stage.sharing,
     ].contains(_stage);
     final message = switch (_stage) {
-      _Stage.consent => l10n.qrLoginConsent,
+      _Stage.consent =>
+        widget.flow.payload.passwordLogin
+            ? l10n.qrLoginPasswordConsent
+            : l10n.qrLoginConsent,
       _Stage.connecting => l10n.qrLoginConnecting,
       _Stage.unlock => l10n.qrLoginUnlockHint,
       _Stage.check => l10n.qrLoginCompareCode,

@@ -23,8 +23,7 @@ args = parser.parse_args()
 if not args.flutter:
     parser.error('Pass --flutter or add Flutter to PATH')
 root = Path(__file__).resolve().parents[1]
-if not (root / 'lib/l10n/l10n.dart').is_file():
-    subprocess.run([args.flutter, 'gen-l10n'], cwd=root, check=True)
+subprocess.run([args.flutter, 'gen-l10n'], cwd=root, check=True)
 target = root / '.dart_tool' / 'qr_login_validation'
 target.mkdir(parents=True, exist_ok=True)
 files = [
@@ -32,14 +31,19 @@ files = [
     'lib/utils/qr_login/msc4108_channel.dart',
     'lib/utils/qr_login/qr_login_existing_device.dart',
     'lib/utils/qr_login/matrix_qr_login_account.dart',
+    'lib/utils/qr_login/credential_vault.dart',
+    'lib/utils/qr_login/matrix_credential_vault.dart',
     'lib/pages/new_private_chat/qr_login_dialog.dart',
     'lib/widgets/adaptive_dialogs/adaptive_dialog_action.dart',
     'lib/config/app_config.dart',
     'test/qr_login_test.dart',
     'test/qr_login_account_test.dart',
+    'test/credential_vault_test.dart',
+    'test/matrix_credential_vault_test.dart',
     'test/qr_login_dialog_test.dart',
     'scripts/qr_login_test_peer.mjs',
 ]
+files += [str(path.relative_to(root)).replace('\\', '/') for path in (root / 'scripts/qr_login_pc_peer').glob('*') if path.is_file()]
 files += [str(path.relative_to(root)).replace('\\', '/') for path in (root / 'lib/l10n').glob('*.dart')]
 manifest = {}
 for name in files:
@@ -76,6 +80,6 @@ flutter:
 env = os.environ.copy()
 if args.js_project:
     env['QR_LOGIN_JS_PROJECT'] = str(Path(args.js_project).resolve())
-for command in [['pub', 'get'], ['test', '--no-pub', '--reporter', 'expanded', 'test/qr_login_test.dart', 'test/qr_login_dialog_test.dart', 'test/qr_login_account_test.dart']]:
+for command in [['pub', 'get'], ['test', '--no-pub', '--concurrency=1', '--reporter', 'expanded', 'test/qr_login_test.dart', 'test/qr_login_dialog_test.dart', 'test/qr_login_account_test.dart', 'test/credential_vault_test.dart', 'test/matrix_credential_vault_test.dart']]:
     subprocess.run([args.flutter, *command], cwd=target, env=env, check=True)
 print(f'QR login validation passed. Source hashes: {target / "source-sha256.json"}')

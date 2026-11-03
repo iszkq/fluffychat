@@ -6,6 +6,7 @@
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/pages/settings_password/settings_password_view.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
+import 'package:fluffychat/utils/qr_login/matrix_credential_vault.dart';
 import 'package:fluffychat/widgets/matrix.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -59,10 +60,16 @@ class SettingsPasswordController extends State<SettingsPassword> {
       loading = true;
     });
     try {
-      await Matrix.of(context).client.changePassword(
-        newPassword1Controller.text,
+      final client = Matrix.of(context).client;
+      final password = newPassword1Controller.text;
+      await client.changePassword(
+        password,
         oldPassword: oldPasswordController.text,
       );
+      MatrixCredentialVault.captureAfterLogin(client, password);
+      oldPasswordController.clear();
+      newPassword1Controller.clear();
+      newPassword2Controller.clear();
       if (!mounted) return;
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text(l10n.passwordHasBeenChanged)),

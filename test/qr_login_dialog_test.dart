@@ -55,13 +55,13 @@ class _Flow extends QrLoginExistingDevice {
   bool needsRecovery = false;
   final finish = Completer<void>();
 
-  _Flow()
+  _Flow({bool passwordLogin = false})
     : super(
         account: _Account(),
         payload: QrLoginPayload.fromBytes([
           ...ascii.encode('MATRIX'),
           2,
-          3,
+          passwordLogin ? 4 : 3,
           ...List.filled(32, 1),
           0,
           'https://example.org/test'.length,
@@ -90,6 +90,14 @@ class _Flow extends QrLoginExistingDevice {
   }) async {
     started = true;
     if (failWith != null) throw QrLoginException(failWith!);
+    if (payload.passwordLogin) {
+      await finish.future;
+      if (!cancelled) {
+        onSharingSecrets();
+        shared = true;
+      }
+      return;
+    }
     if (needsRecovery && (unlockSecrets == null || !await unlockSecrets())) {
       return;
     }
@@ -191,6 +199,37 @@ void main() {
       await loader.load();
     }
   });
+  testWidgets(
+    'password QR needs one phone consent and no code, password field or browser',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final flow = _Flow(passwordLogin: true);
+      await _openDialog(
+        tester,
+        flow,
+        open: (_) async => throw StateError('No browser'),
+        locale: const Locale('zh'),
+      );
+      expect(flow.started, isFalse);
+      await _snapshot(tester, 'password-consent');
+      await tester.tap(find.text('继续'));
+      await tester.pump();
+      expect(flow.started, isTrue);
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text('42'), findsNothing);
+      expect(find.text('Open authorization page'), findsNothing);
+      flow.finish.complete();
+      await tester.pumpAndSettle();
+      expect(flow.shared, isTrue);
+      await _snapshot(tester, 'password-success');
+      await tester.tap(find.text('关闭'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('local recovery can retry; input is cleared before code check', (
     tester,
   ) async {
@@ -309,6 +348,38 @@ void main() {
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
   });
+
+  for (final entry in {
+    'password_not_available': '尚未保存登录凭据',
+    'password_invalid': '保存的密码已失效',
+    'credentials_read_failed': '读取服务器登录凭据失败',
+    'credentials_upload_failed': '登录凭据尚未保存到服务器',
+    'credentials_timeout': '读取登录凭据超时',
+    'credentials_key_changed': '账号加密密钥已变更',
+    'credentials_corrupt': '服务器登录凭据无法解密',
+    'session_expired': '手机登录已失效',
+    'request_timeout': '扫码步骤超时',
+    'rate_limited': '登录过于频繁',
+    'account_disabled': '账号已被服务器停用',
+    'password_unsupported': '服务器不支持密码登录',
+    'login_failed': '电脑连接登录服务器失败',
+  }.entries) {
+    testWidgets('password login explains ${entry.key} in Chinese', (
+      tester,
+    ) async {
+      final flow = _Flow(passwordLogin: true)..failWith = entry.key;
+      await _openDialog(tester, flow, locale: const Locale('zh'));
+      await tester.tap(find.text('继续'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining(entry.value), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(flow.shared, isFalse);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('关闭'));
+      await tester.pumpAndSettle();
+      expect(flow.cancelled, isTrue);
+    });
+  }
 
   testWidgets('timeout releases pending confirmation and stops login', (
     tester,

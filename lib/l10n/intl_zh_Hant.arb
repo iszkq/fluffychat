@@ -2426,5 +2426,19 @@
             }
         }
     },
-    "updateInstalledDescription": "目前使用 iszkq/fluffychat 自訂版。更新記錄中可查看此分支的改進和已知問題。"
+    "updateInstalledDescription": "目前使用 iszkq/fluffychat 自訂版。更新記錄中可查看此分支的改進和已知問題。",
+    "qrLoginPasswordUnavailable": "尚未儲存登入憑據，請在手機重新登入一次後掃碼。",
+    "qrLoginPasswordConsent": "登入此電腦並同步可用解密金鑰？",
+    "qrLoginPasswordInvalid": "儲存的密碼已失效，請在手機使用目前密碼重新登入。",
+    "qrLoginCredentialsReadFailed": "讀取伺服器登入憑據失敗，請檢查手機網路後重試。",
+    "qrLoginCredentialsUploadFailed": "登入憑據尚未儲存到伺服器，請檢查手機網路後重試。",
+    "qrLoginCredentialsTimeout": "讀取登入憑據逾時，請檢查手機網路後重新掃碼。",
+    "qrLoginCredentialsKeyChanged": "帳號加密金鑰已變更，請在手機重新登入以更新憑據。",
+    "qrLoginCredentialsCorrupt": "伺服器登入憑據無法解密，請在手機重新登入後重試。",
+    "qrLoginSessionExpired": "手機登入已失效，請先重新登入再掃碼。",
+    "qrLoginRequestTimeout": "掃碼步驟逾時，請檢查兩端網路後重新掃碼。",
+    "qrLoginRateLimited": "登入過於頻繁，請稍後重新掃碼。",
+    "qrLoginAccountDisabled": "帳號已被伺服器停用，請聯絡伺服器管理員。",
+    "qrLoginPasswordUnsupported": "伺服器不支援密碼登入，請使用其他登入方式。",
+    "qrLoginDesktopLoginFailed": "電腦連線登入伺服器失敗，請檢查電腦網路後重試。"
 }

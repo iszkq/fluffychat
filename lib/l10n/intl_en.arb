@@ -2901,5 +2901,19 @@
     "qrLoginSecurityError": "The login security check failed. Cancel this request and generate a new QR code.",
     "qrLoginNetworkError": "Could not complete QR login. Check your connection and generate a new QR code to retry.",
     "qrLoginInvalidCode": "This login QR code is invalid or uses an unsupported format. Scan a fresh login code displayed on the new device.",
-    "qrLoginVerifyOnDesktop": "The account is signed in on the desktop. Close this dialog, accept device verification on both devices, and compare the emoji. Available keys will be shared after verification; no keys have been transferred yet."
+    "qrLoginVerifyOnDesktop": "The account is signed in on the desktop. Close this dialog, accept device verification on both devices, and compare the emoji. Available keys will be shared after verification; no keys have been transferred yet.",
+    "qrLoginPasswordUnavailable": "No saved login credentials. Sign in once on this phone, then scan again.",
+    "qrLoginPasswordConsent": "Log in on this computer and share your available decryption keys?",
+    "qrLoginPasswordInvalid": "The saved password is outdated. Sign in again with your current password.",
+    "qrLoginCredentialsReadFailed": "Could not read login credentials from the server. Check this phone’s connection and try again.",
+    "qrLoginCredentialsUploadFailed": "Login credentials have not reached the server. Check this phone’s connection and try again.",
+    "qrLoginCredentialsTimeout": "Reading login credentials timed out. Check this phone’s connection and scan again.",
+    "qrLoginCredentialsKeyChanged": "Encryption keys changed. Sign in again on this phone to update login credentials.",
+    "qrLoginCredentialsCorrupt": "Saved login credentials could not be decrypted. Sign in again on this phone.",
+    "qrLoginSessionExpired": "This phone’s session expired. Sign in again before scanning.",
+    "qrLoginRequestTimeout": "The login step timed out. Check both devices’ connections and scan again.",
+    "qrLoginRateLimited": "Too many login attempts. Wait a moment and scan again.",
+    "qrLoginAccountDisabled": "The server disabled this account. Contact your server administrator.",
+    "qrLoginPasswordUnsupported": "The server does not support password login. Use another login method.",
+    "qrLoginDesktopLoginFailed": "The computer could not connect to the login server. Check its connection and try again."
 }

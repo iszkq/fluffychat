@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:fluffychat/l10n/l10n.dart';
 import 'package:fluffychat/utils/localized_exception_extension.dart';
+import 'package:fluffychat/utils/qr_login/matrix_credential_vault.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_text_input_dialog.dart';
 import 'package:fluffychat/widgets/future_loading_dialog.dart';
@@ -75,6 +76,7 @@ class LoginController extends State<Login> {
         identifier = AuthenticationUserIdentifier(user: username);
       }
       final client = await matrix.getLoginClient();
+      final password = passwordController.text;
       await client.login(
         LoginType.mLoginPassword,
         identifier: identifier,
@@ -83,9 +85,11 @@ class LoginController extends State<Login> {
         user: identifier.type == AuthenticationIdentifierTypes.userId
             ? username
             : null,
-        password: passwordController.text,
+        password: password,
         initialDeviceDisplayName: PlatformInfos.appDisplayName,
       );
+      MatrixCredentialVault.captureAfterLogin(client, password);
+      passwordController.clear();
       if (mounted) {
         context.go('/backup');
       }
