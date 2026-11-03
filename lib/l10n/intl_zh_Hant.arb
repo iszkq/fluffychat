@@ -2427,7 +2427,7 @@
         }
     },
     "updateInstalledDescription": "目前使用 iszkq/fluffychat 自訂版。更新記錄中可查看此分支的改進和已知問題。",
-    "qrLoginPasswordUnavailable": "尚未儲存登入憑據，請在手機重新登入一次後掃碼。",
+    "qrLoginPasswordUnavailable": "未儲存登入憑證，請在 App 內用帳號密碼登入；網頁授權無法儲存密碼。",
     "qrLoginPasswordConsent": "登入此電腦並同步可用解密金鑰？",
     "qrLoginPasswordInvalid": "儲存的密碼已失效，請在手機使用目前密碼重新登入。",
     "qrLoginCredentialsReadFailed": "讀取伺服器登入憑據失敗，請檢查手機網路後重試。",

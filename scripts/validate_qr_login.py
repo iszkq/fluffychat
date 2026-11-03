@@ -36,7 +36,9 @@ files = [
     'lib/pages/new_private_chat/qr_login_dialog.dart',
     'lib/widgets/adaptive_dialogs/adaptive_dialog_action.dart',
     'lib/config/app_config.dart',
+    'lib/utils/sign_in_flows/sign_in_method.dart',
     'test/qr_login_test.dart',
+    'test/sign_in_method_test.dart',
     'test/qr_login_account_test.dart',
     'test/credential_vault_test.dart',
     'test/matrix_credential_vault_test.dart',
@@ -80,6 +82,6 @@ flutter:
 env = os.environ.copy()
 if args.js_project:
     env['QR_LOGIN_JS_PROJECT'] = str(Path(args.js_project).resolve())
-for command in [['pub', 'get'], ['test', '--no-pub', '--concurrency=1', '--reporter', 'expanded', 'test/qr_login_test.dart', 'test/qr_login_dialog_test.dart', 'test/qr_login_account_test.dart', 'test/credential_vault_test.dart', 'test/matrix_credential_vault_test.dart']]:
+for command in [['pub', 'get'], ['test', '--no-pub', '--concurrency=1', '--reporter', 'expanded', 'test/qr_login_test.dart', 'test/qr_login_dialog_test.dart', 'test/qr_login_account_test.dart', 'test/credential_vault_test.dart', 'test/matrix_credential_vault_test.dart', 'test/sign_in_method_test.dart']]:
     subprocess.run([args.flutter, *command], cwd=target, env=env, check=True)
 print(f'QR login validation passed. Source hashes: {target / "source-sha256.json"}')

@@ -8,7 +8,7 @@ description: Chat with your friends.
 publish_to: none
 # Platform build numbers are assigned by the release workflow.
 # Keep the Snap version in sync when changing this version.
-version: 3.0.2
+version: 3.0.3
 
 environment:
   sdk: ">=3.11.1 <4.0.0"

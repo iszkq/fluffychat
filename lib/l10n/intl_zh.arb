@@ -2912,7 +2912,7 @@
     "qrLoginNetworkError": "扫码登录未完成，请检查网络，并重新生成二维码后重试。",
     "qrLoginInvalidCode": "登录二维码无效或格式暂不支持，请扫描新设备上重新生成的登录码。",
     "qrLoginVerifyOnDesktop": "账号已在电脑登录。请关闭此窗口，在电脑和手机上接受设备验证并核对图形。验证通过后会共享可用密钥；当前尚未完成密钥传递。",
-    "qrLoginPasswordUnavailable": "尚未保存登录凭据，请在手机重新登录一次后扫码。",
+    "qrLoginPasswordUnavailable": "未保存登录凭据，请在 App 内用账号密码登录；网页授权无法保存密码。",
     "qrLoginPasswordConsent": "登录此电脑并同步可用解密密钥？",
     "qrLoginPasswordInvalid": "保存的密码已失效，请在手机使用当前密码重新登录。",
     "qrLoginCredentialsReadFailed": "读取服务器登录凭据失败，请检查手机网络后重试。",

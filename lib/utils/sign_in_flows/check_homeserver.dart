@@ -9,6 +9,7 @@ import 'package:fluffychat/pages/sign_in/view_model/model/public_homeserver_data
 import 'package:fluffychat/utils/localized_exception_extension.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/sign_in_flows/oidc_login.dart';
+import 'package:fluffychat/utils/sign_in_flows/sign_in_method.dart';
 import 'package:fluffychat/utils/sign_in_flows/sso_login.dart';
 import 'package:fluffychat/widgets/adaptive_dialogs/show_ok_cancel_alert_dialog.dart';
 import 'package:fluffychat/widgets/matrix.dart';
@@ -40,9 +41,19 @@ Future<void> connectToHomeserverFlow(
 
     final regLink = homeserverData.regLink;
     final supportsSso = loginFlows.any((flow) => flow.type == 'm.login.sso');
+    final signInMethod = selectSignInMethod(
+      signUp: signUp,
+      supportsPassword: loginFlows.any(
+        (flow) => flow.type == 'm.login.password',
+      ),
+      supportsOidc:
+          authMetadata != null && AppSettings.enableMatrixNativeOIDC.value,
+      supportsSso: supportsSso,
+    );
 
     if ((kIsWeb || PlatformInfos.isLinux) &&
-        (supportsSso || authMetadata != null || (signUp && regLink != null))) {
+        (signInMethod != SignInMethod.password ||
+            (signUp && regLink != null))) {
       if (!context.mounted) return;
       final consent = await showOkCancelAlertDialog(
         context: context,
@@ -55,9 +66,9 @@ Future<void> connectToHomeserverFlow(
     }
     if (!context.mounted) return;
 
-    if (authMetadata != null && AppSettings.enableMatrixNativeOIDC.value) {
+    if (signInMethod == SignInMethod.oidc) {
       await oidcLoginFlow(client, context, signUp);
-    } else if (supportsSso) {
+    } else if (signInMethod == SignInMethod.sso) {
       await ssoLoginFlow(client, context, signUp, loginFlows);
     } else {
       if (signUp && regLink != null) {

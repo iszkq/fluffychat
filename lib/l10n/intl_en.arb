@@ -2902,7 +2902,7 @@
     "qrLoginNetworkError": "Could not complete QR login. Check your connection and generate a new QR code to retry.",
     "qrLoginInvalidCode": "This login QR code is invalid or uses an unsupported format. Scan a fresh login code displayed on the new device.",
     "qrLoginVerifyOnDesktop": "The account is signed in on the desktop. Close this dialog, accept device verification on both devices, and compare the emoji. Available keys will be shared after verification; no keys have been transferred yet.",
-    "qrLoginPasswordUnavailable": "No saved login credentials. Sign in once on this phone, then scan again.",
+    "qrLoginPasswordUnavailable": "No login credentials saved. Sign in with your password inside the app; browser sign-in cannot save it.",
     "qrLoginPasswordConsent": "Log in on this computer and share your available decryption keys?",
     "qrLoginPasswordInvalid": "The saved password is outdated. Sign in again with your current password.",
     "qrLoginCredentialsReadFailed": "Could not read login credentials from the server. Check this phone’s connection and try again.",

@@ -350,7 +350,7 @@ void main() {
   });
 
   for (final entry in {
-    'password_not_available': '尚未保存登录凭据',
+    'password_not_available': '未保存登录凭据',
     'password_invalid': '保存的密码已失效',
     'credentials_read_failed': '读取服务器登录凭据失败',
     'credentials_upload_failed': '登录凭据尚未保存到服务器',
