@@ -1,7 +1,7 @@
 name: fluffychat
 title: FluffyChat Matrix Messenger
 base: core24
-version: 3.0.3
+version: 3.0.4
 license: AGPL-3.0
 summary: The cutest messenger in the Matrix network
 description: |
