@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/krille-chan/fluffychat",
+  "commit": "8d11b6b3c554919d2f39c4ea239a9dede6e1cee4",
+  "matrixSdk": "14.1.0",
+  "files": {
+    "lib/utils/init_with_restore.dart": "edaf826062aaca8db929bf2b2f630e1b198d4f80ae65c44250d456abf47bd9bf",
+    "lib/utils/custom_http_client.dart": "587086a09698a268efeff1224c202736c46a982895250597928caa1c5c8a144c",
+    "lib/utils/sign_in_flows/oidc_login.dart": "e654a9cf654aaa9cdb509262ac44366a6fe558b425d615ffae750a2856a0f84d",
+    "lib/utils/sign_in_flows/sso_login.dart": "441f53c356daf05ec11a4eb24fa75fa1a82677543733e814dfa7ed2401ebb19e"
+  }
+}

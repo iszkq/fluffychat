@@ -12,15 +12,18 @@ abstract class SessionDiagnostics {
     Logs().i('[Session] QR authorization started on existing device');
   }
 
-  static void attach(Client client) {
+  static void attach(Client client, {Future<void> Function(String)? persist}) {
     client.onSessionCleared.stream.listen((reason) {
       final qr = _lastQr[client];
       // SDK clear() empties the old log buffer. Emit the reason afterwards so
       // a report collected from the logged-out screen retains the evidence.
-      Logs().w(
-        '[Session] Local session cleared: ${reason.name}; '
-        'seconds since QR: ${qr == null ? 'none' : DateTime.now().difference(qr).inSeconds}',
-      );
+      final entry =
+          '[Session] ${DateTime.now().toUtc().toIso8601String()} Local session cleared: ${reason.name}; '
+          'seconds since QR: ${qr == null ? 'none' : DateTime.now().difference(qr).inSeconds}';
+      Logs().w(entry);
+      persist?.call(entry).catchError((_) {
+        Logs().w('[Session] Unable to persist diagnostic reason');
+      });
     });
   }
 }

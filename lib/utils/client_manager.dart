@@ -14,7 +14,6 @@ import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call_memb
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/room_mention_state.dart';
 import 'package:fluffychat/utils/session_diagnostics.dart';
-import 'package:fluffychat/utils/session_refresh.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_vodozemac/flutter_vodozemac.dart' as vod;
@@ -154,12 +153,25 @@ abstract class ClientManager {
             (share) => share.name == shareKeysWith,
           ) ??
           ShareKeysWith.all,
-      onSoftLogout: enableSoftLogout ? refreshSessionSafely : null,
+      onSoftLogout: enableSoftLogout ? (c) => c.refreshAccessToken() : null,
       sendTimelineEventTimeout: Duration(
         seconds: AppSettings.sendTimelineEventTimeout.value,
       ),
     );
-    SessionDiagnostics.attach(client);
+    const diagnosticKey = 'session_clear_diagnostics_v1';
+    for (final entry in store.getStringList(diagnosticKey) ?? <String>[]) {
+      Logs().w(entry);
+    }
+    SessionDiagnostics.attach(
+      client,
+      persist: (entry) async {
+        final entries = [...?store.getStringList(diagnosticKey), entry];
+        await store.setStringList(
+          diagnosticKey,
+          entries.skip(entries.length > 20 ? entries.length - 20 : 0).toList(),
+        );
+      },
+    );
     final mentionStateKey = 'room_mention_power_levels_v1.$clientName';
     if (store.getBool(mentionStateKey) != true) {
       try {
