@@ -25,6 +25,11 @@ on:
           - all
           - android
           - ios
+      run_native_camera_tests:
+        description: Run iOS simulator camera regression (keep enabled for camera changes)
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -139,6 +144,8 @@ jobs:
         run: brew install sqlcipher
 
       - name: Test native camera orientation and Chinese controls
+        if: inputs.run_native_camera_tests
+        timeout-minutes: 10
         run: bash scripts/test-ios-camera.sh
 
       - uses: dtolnay/rust-toolchain@stable

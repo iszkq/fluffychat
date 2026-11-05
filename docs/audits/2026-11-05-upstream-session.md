@@ -58,3 +58,9 @@ can themselves clear the local session even with the upstream callback.
 Use the same iOS bundle identity and signing identity when updating. Reinstalling
 with a different signing identity is a separate storage migration experiment
 and cannot be used to establish a QR login regression.
+
+The session comparison package skips the unchanged native camera simulator test:
+the hosted Intel simulator stalled before app compilation. The normal mobile
+workflow keeps that test enabled with a ten-minute timeout. This package still
+runs the complete login/QR/recovery suite and verifies camera code inclusion and
+the compiled iOS package identity. No camera sources changed.
