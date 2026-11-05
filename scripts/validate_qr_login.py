@@ -33,6 +33,7 @@ files = [
     'lib/utils/qr_login/matrix_qr_login_account.dart',
     'lib/utils/qr_login/credential_vault.dart',
     'lib/utils/qr_login/matrix_credential_vault.dart',
+    'lib/utils/session_diagnostics.dart',
     'lib/pages/new_private_chat/qr_login_dialog.dart',
     'lib/widgets/adaptive_dialogs/adaptive_dialog_action.dart',
     'lib/config/app_config.dart',
