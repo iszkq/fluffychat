@@ -13,6 +13,8 @@ import 'package:fluffychat/utils/init_with_restore.dart';
 import 'package:fluffychat/utils/matrix_live_kit_calls/matrix_live_kit_call_member.dart';
 import 'package:fluffychat/utils/platform_infos.dart';
 import 'package:fluffychat/utils/room_mention_state.dart';
+import 'package:fluffychat/utils/session_diagnostics.dart';
+import 'package:fluffychat/utils/session_refresh.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_vodozemac/flutter_vodozemac.dart' as vod;
@@ -152,11 +154,12 @@ abstract class ClientManager {
             (share) => share.name == shareKeysWith,
           ) ??
           ShareKeysWith.all,
-      onSoftLogout: enableSoftLogout ? (c) => c.refreshAccessToken() : null,
+      onSoftLogout: enableSoftLogout ? refreshSessionSafely : null,
       sendTimelineEventTimeout: Duration(
         seconds: AppSettings.sendTimelineEventTimeout.value,
       ),
     );
+    SessionDiagnostics.attach(client);
     final mentionStateKey = 'room_mention_power_levels_v1.$clientName';
     if (store.getBool(mentionStateKey) != true) {
       try {

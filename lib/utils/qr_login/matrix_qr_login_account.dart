@@ -8,6 +8,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:matrix/encryption.dart';
 import 'package:matrix/matrix.dart';
 
+import '../session_diagnostics.dart';
+
 import 'credential_vault.dart';
 import 'matrix_credential_vault.dart';
 import 'msc4108_channel.dart';
@@ -30,7 +32,9 @@ class MatrixQrLoginAccount extends QrLoginAccount {
 
   MatrixQrLoginAccount(this.client)
     : userId = client.userID ?? '',
-      _deviceId = client.deviceID;
+      _deviceId = client.deviceID {
+    SessionDiagnostics.qrStarted(client);
+  }
 
   void _checkAccount() {
     if (_cleared ||

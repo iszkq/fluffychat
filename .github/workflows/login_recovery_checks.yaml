@@ -14,6 +14,10 @@ on:
       - 'scripts/qr_login_pc_peer/**'
       - 'scripts/qr_login_test_peer.mjs'
       - 'lib/utils/crypto_identity_watcher.dart'
+      - 'lib/utils/client_manager.dart'
+      - 'lib/utils/session_refresh.dart'
+      - 'lib/utils/session_diagnostics.dart'
+      - 'test/session_refresh_test.dart'
       - 'test/*recovery*test.dart'
       - 'test/*login*test.dart'
       - 'test/crypto_identity_watcher_test.dart'
@@ -53,5 +57,7 @@ jobs:
           flutter analyze --no-fatal-infos --no-fatal-warnings lib test/bootstrap_recovery_test.dart test/native_password_login_test.dart test/login_discovery_test.dart test/crypto_identity_watcher_test.dart test/cached_secrets_test.dart
       - name: Run the actual login and recovery pages
         run: flutter test --no-pub --concurrency=1 --reporter expanded test/native_password_login_test.dart test/bootstrap_recovery_test.dart
+      - name: Keep phone sessions during temporary refresh failures
+        run: flutter test --no-pub --reporter expanded test/session_refresh_test.dart
       - name: Run QR interoperability, encrypted credentials, discovery and delayed-secret regressions
         run: python3 scripts/validate_qr_login.py --flutter "$(command -v flutter)" --js-project "$RUNNER_TEMP/qr-login-peer"
