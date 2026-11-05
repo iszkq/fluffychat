@@ -21,7 +21,9 @@ abstract class SessionDiagnostics {
           '[Session] ${DateTime.now().toUtc().toIso8601String()} Local session cleared: ${reason.name}; '
           'seconds since QR: ${qr == null ? 'none' : DateTime.now().difference(qr).inSeconds}';
       Logs().w(entry);
-      persist?.call(entry).catchError((_) {
+      Future<void>.sync(() async {
+        await persist?.call(entry);
+      }).catchError((_) {
         Logs().w('[Session] Unable to persist diagnostic reason');
       });
     });

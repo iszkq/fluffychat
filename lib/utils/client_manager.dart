@@ -159,8 +159,12 @@ abstract class ClientManager {
       ),
     );
     const diagnosticKey = 'session_clear_diagnostics_v1';
-    for (final entry in store.getStringList(diagnosticKey) ?? <String>[]) {
-      Logs().w(entry);
+    try {
+      for (final entry in store.getStringList(diagnosticKey) ?? <String>[]) {
+        Logs().w(entry);
+      }
+    } catch (_) {
+      Logs().w('[Session] Previous diagnostics unavailable');
     }
     SessionDiagnostics.attach(
       client,

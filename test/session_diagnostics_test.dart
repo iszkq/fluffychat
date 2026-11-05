@@ -18,6 +18,24 @@ class _Database implements DatabaseApi {
 
 void main() {
   test(
+    'a failed diagnostic sink cannot interrupt SDK session clearing',
+    () async {
+      final db = _Database();
+      final phone = Client('failed-diagnostic-fixture', database: db);
+      phone.accessToken = 'synthetic-private-token';
+      SessionDiagnostics.attach(
+        phone,
+        persist: (_) {
+          throw StateError('Synthetic preference failure');
+        },
+      );
+      await phone.clear(reason: SessionClearReason.unknownToken);
+      await Future<void>.delayed(Duration.zero);
+      expect(db.clears, 1);
+      expect(phone.isLogged(), isFalse);
+    },
+  );
+  test(
     'diagnostics observe clearing without making authenticated requests',
     () async {
       final db = _Database();
